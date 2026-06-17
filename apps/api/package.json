@@ -6,13 +6,23 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prisma:generate": "node scripts/prisma-run.cjs generate --schema prisma/schema.prisma",
+    "prisma:migrate": "node scripts/prisma-run.cjs migrate dev --schema prisma/schema.prisma",
+    "prisma:studio": "node scripts/prisma-run.cjs studio --schema prisma/schema.prisma",
+    "prisma:reset": "node scripts/prisma-run.cjs migrate reset --force --skip-seed --schema prisma/schema.prisma",
+    "postinstall": "node scripts/prisma-run.cjs generate --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.8",
     "@nestjs/core": "^10.4.8",
     "@nestjs/platform-express": "^10.4.8",
+    "@prisma/client": "^6.16.0",
+    "dotenv": "^17.2.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.0"
   }
 }
