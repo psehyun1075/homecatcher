@@ -135,6 +135,7 @@ model UserAccount {
 
   familyMembers  FamilyMember[]
   ownedFamilies   FamilyGroup[]
+  sessions       UserSession[]
   invitesCreated Invite[]         @relation("InviteCreatedBy")
   acceptedInvites Invite[]
   deviceTokens   DeviceToken[]
@@ -142,6 +143,23 @@ model UserAccount {
   notifications  Notification[]
   auditLogs      AuditLog[]
   calendarViews  CalendarViewSetting[]
+}
+
+model UserSession {
+  id               String      @id @default(uuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime?
+
+  user             UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
 
 model FamilyGroup {
