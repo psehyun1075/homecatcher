@@ -1,0 +1,723 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DELETED
+}
+
+enum FamilyRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum TemplateTargetType {
+  FAMILY
+  HOUSEHOLD_ITEM
+  TODO_TASK
+  HOME_MANUAL
+  FIXED_EXPENSE
+  ACCOUNT_CATEGORY
+  FAMILY_EVENT
+}
+
+enum TemplateItemType {
+  HOUSEHOLD_ITEM
+  TODO_TASK
+  HOME_MANUAL
+  FIXED_EXPENSE
+  ACCOUNT_CATEGORY
+  FAMILY_EVENT
+}
+
+enum MetadataStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+  TIMEOUT
+}
+
+enum TodoScheduleType {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum EventType {
+  FAMILY
+  TRIP
+  WORK
+  SCHOOL
+  HEALTH
+  BIRTHDAY
+  OTHER
+}
+
+enum AccountEntryType {
+  EXPENSE
+  INCOME
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum FixedExpenseStatus {
+  ACTIVE
+  PAUSED
+  PAID
+  CANCELED
+}
+
+enum NotificationType {
+  GENERAL
+  REMINDER
+  TASK
+  EVENT
+  EXPENSE
+  FEED
+  APPRECIATION
+  SYSTEM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+  CANCELED
+}
+
+enum ActivityType {
+  ITEM_PURCHASE
+  TODO_COMPLETE
+  FIXED_EXPENSE_PAID
+  MANUAL_CREATED
+  EVENT_CREATED
+  APPRECIATION_SENT
+  MEMBER_JOINED
+}
+
+enum AppreciationType {
+  THANKS
+  PRAISE
+  HELP
+  SUPPORT
+  ENCOURAGEMENT
+}
+
+model UserAccount {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  status       UserStatus   @default(ACTIVE)
+  lastLoginAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  familyMembers  FamilyMember[]
+  ownedFamilies   FamilyGroup[]
+  invitesCreated Invite[]         @relation("InviteCreatedBy")
+  acceptedInvites Invite[]
+  deviceTokens   DeviceToken[]
+  consentLogs    ConsentLog[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  calendarViews  CalendarViewSetting[]
+}
+
+model FamilyGroup {
+  id           String      @id @default(uuid())
+  familyName   String
+  ownerUserId  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  ownerUser            UserAccount?         @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  members              FamilyMember[]
+  invites              Invite[]
+  householdItems       HouseholdItem[]
+  todoTasks            TodoTask[]
+  homeManuals          HomeManual[]
+  familyEvents         FamilyEvent[]
+  accountCategories    AccountCategory[]
+  accountEntries       AccountEntry[]
+  fixedExpenses        FixedExpense[]
+  activityLogs         ActivityLog[]
+  calendarViewSettings CalendarViewSetting[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+}
+
+model FamilyMember {
+  id           String      @id @default(uuid())
+  familyId     String
+  userId       String?
+  role         FamilyRole  @default(MEMBER)
+  displayName  String?
+  joinedAt     DateTime    @default(now())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  family       FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user         UserAccount?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  plannerTasks TodoTask[]    @relation("TodoPlanner")
+  assigneeTasks TodoTask[]   @relation("TodoAssignee")
+  completions  TodoCompletion[]
+  purchasedItems ItemPurchaseLog[] @relation("ItemPurchasedBy")
+  actedActivities ActivityLog[] @relation("ActivityActor")
+  eventParticipants EventParticipant[]
+  createdAccountEntries AccountEntry[]
+  sentAppreciations Appreciation[] @relation("AppreciationFromMember")
+  receivedAppreciations Appreciation[] @relation("AppreciationToMember")
+
+  @@unique([familyId, userId])
+  @@index([familyId])
+  @@index([userId])
+}
+
+model Invite {
+  id              String       @id @default(uuid())
+  familyId        String
+  createdByUserId  String?
+  code            String       @unique
+  status          InviteStatus @default(PENDING)
+  expiresAt       DateTime?
+  acceptedByUserId String?
+  acceptedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  family          FamilyGroup  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdBy       UserAccount? @relation("InviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  acceptedBy      UserAccount? @relation(fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([familyId])
+  @@index([createdByUserId])
+  @@index([acceptedByUserId])
+}
+
+model DeviceToken {
+  id          String   @id @default(uuid())
+  userId      String
+  platform    String
+  token       String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  user        UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ConsentLog {
+  id             String   @id @default(uuid())
+  userId         String
+  consentKey     String
+  consentVersion  String
+  agreedAt       DateTime @default(now())
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  user           UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([consentKey])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  familyId    String?
+  action      String
+  entityType  String
+  entityId    String
+  payload     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  user        UserAccount? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  family      FamilyGroup? @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([entityType, entityId])
+}
+
+model TemplateSet {
+  id          String             @id @default(uuid())
+  slug        String             @unique
+  targetType  TemplateTargetType
+  name        String
+  description String?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  items       TemplateItem[]
+}
+
+model TemplateItem {
+  id           String           @id @default(uuid())
+  templateSetId String
+  itemType     TemplateItemType
+  title        String
+  content      Json?
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+
+  templateSet  TemplateSet      @relation(fields: [templateSetId], references: [id], onDelete: Cascade)
+
+  @@index([templateSetId])
+}
+
+model HouseholdItem {
+  id            String   @id @default(uuid())
+  familyId      String
+  name          String
+  category      String?
+  memo          String?
+  minStock      Int?
+  cycleDays     Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  family        FamilyGroup      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  productLinks  ProductLink[]
+  purchaseRule  ItemPurchaseRule?
+  purchaseLogs  ItemPurchaseLog[]
+
+  @@index([familyId])
+  @@index([familyId, name])
+}
+
+model ProductLink {
+  id              String         @id @default(uuid())
+  householdItemId String
+  url             String
+  productName     String?
+  productImageUrl String?
+  mallName        String?
+  lastPrice       Decimal?       @db.Decimal(12, 2)
+  metadataStatus  MetadataStatus  @default(TIMEOUT)
+  previewedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  householdItem   HouseholdItem   @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+
+  @@index([householdItemId])
+  @@index([url])
+}
+
+model ItemPurchaseRule {
+  id                  String   @id @default(uuid())
+  householdItemId     String   @unique
+  exactOnly           Boolean  @default(false)
+  priceLimit          Decimal? @db.Decimal(12, 2)
+  approvalThreshold   Decimal? @db.Decimal(12, 2)
+  preferredMallName   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  householdItem       HouseholdItem @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+}
+
+model ItemPurchaseLog {
+  id                  String   @id @default(uuid())
+  householdItemId     String
+  purchasedByMemberId String?
+  amount              Decimal  @db.Decimal(12, 2)
+  purchasedAt         DateTime @default(now())
+  note                String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  householdItem       HouseholdItem   @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+  purchasedByMember   FamilyMember?   @relation("ItemPurchasedBy", fields: [purchasedByMemberId], references: [id], onDelete: SetNull)
+  itemAccountLink     ItemAccountLink?
+
+  @@index([householdItemId])
+  @@index([purchasedByMemberId])
+}
+
+model ItemAccountLink {
+  id                String   @id @default(uuid())
+  itemPurchaseLogId  String   @unique
+  accountEntryId     String   @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  itemPurchaseLog    ItemPurchaseLog @relation(fields: [itemPurchaseLogId], references: [id], onDelete: Cascade)
+  accountEntry       AccountEntry    @relation(fields: [accountEntryId], references: [id], onDelete: Cascade)
+}
+
+model TodoTask {
+  id                String    @id @default(uuid())
+  familyId          String
+  title             String
+  description       String?
+  plannerMemberId   String?
+  assigneeMemberId  String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  family            FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  plannerMember     FamilyMember? @relation("TodoPlanner", fields: [plannerMemberId], references: [id], onDelete: SetNull)
+  assigneeMember    FamilyMember? @relation("TodoAssignee", fields: [assigneeMemberId], references: [id], onDelete: SetNull)
+  schedules         TodoSchedule[]
+  completions       TodoCompletion[]
+
+  @@index([familyId])
+  @@index([plannerMemberId])
+  @@index([assigneeMemberId])
+}
+
+model TodoSchedule {
+  id             String           @id @default(uuid())
+  todoTaskId     String
+  scheduleType   TodoScheduleType
+  repeatRule     Json?
+  nextDueAt      DateTime?
+  isEnabled      Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  todoTask       TodoTask         @relation(fields: [todoTaskId], references: [id], onDelete: Cascade)
+
+  @@index([todoTaskId])
+  @@index([nextDueAt])
+}
+
+model TodoCompletion {
+  id                String   @id @default(uuid())
+  todoTaskId        String
+  completedByMemberId String?
+  completedAt       DateTime @default(now())
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  todoTask          TodoTask      @relation(fields: [todoTaskId], references: [id], onDelete: Cascade)
+  completedByMember FamilyMember? @relation(fields: [completedByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([todoTaskId])
+  @@index([completedByMemberId])
+}
+
+model HomeManual {
+  id          String   @id @default(uuid())
+  familyId    String
+  title       String
+  category    String?
+  description String?
+  isPinned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  family      FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  steps       ManualStep[]
+  relations   ManualRelation[]
+
+  @@index([familyId])
+}
+
+model ManualStep {
+  id           String   @id @default(uuid())
+  homeManualId  String
+  stepNo       Int
+  title        String
+  description  String?
+  warning      String?
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  homeManual   HomeManual        @relation(fields: [homeManualId], references: [id], onDelete: Cascade)
+  outgoingRelations ManualRelation[] @relation("ManualStepFrom")
+  incomingRelations ManualRelation[] @relation("ManualStepTo")
+
+  @@index([homeManualId])
+  @@unique([homeManualId, stepNo])
+}
+
+model ManualRelation {
+  id              String   @id @default(uuid())
+  homeManualId    String
+  fromStepId      String
+  toStepId        String
+  relationKind    String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  homeManual      HomeManual   @relation(fields: [homeManualId], references: [id], onDelete: Cascade)
+  fromStep        ManualStep   @relation("ManualStepFrom", fields: [fromStepId], references: [id], onDelete: Cascade)
+  toStep          ManualStep   @relation("ManualStepTo", fields: [toStepId], references: [id], onDelete: Cascade)
+
+  @@index([homeManualId])
+  @@index([fromStepId])
+  @@index([toStepId])
+}
+
+model FamilyEvent {
+  id             String     @id @default(uuid())
+  familyId       String
+  eventType      EventType
+  title          String
+  description    String?
+  location       String?
+  startAt        DateTime
+  endAt          DateTime?
+  displayColor   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  family         FamilyGroup     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  participants   EventParticipant[]
+  eventAccountLinks EventAccountLink[]
+
+  @@index([familyId])
+  @@index([startAt])
+}
+
+model EventParticipant {
+  id              String   @id @default(uuid())
+  familyEventId   String
+  familyMemberId  String?
+  displayName     String?
+  isPrimary       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  familyEvent     FamilyEvent   @relation(fields: [familyEventId], references: [id], onDelete: Cascade)
+  familyMember    FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+
+  @@index([familyEventId])
+  @@index([familyMemberId])
+}
+
+model CalendarViewSetting {
+  id             String   @id @default(uuid())
+  familyId       String
+  userId         String?
+  timezone       String   @default("Asia/Seoul")
+  weekStartDay   Int      @default(1)
+  displayOptions Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  family         FamilyGroup  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user           UserAccount? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+model AccountCategory {
+  id           String          @id @default(uuid())
+  familyId     String
+  name         String
+  categoryType AccountEntryType @default(EXPENSE)
+  sortOrder    Int             @default(0)
+  isSystem     Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
+
+  family       FamilyGroup     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  accountEntries AccountEntry[]
+  fixedExpenses FixedExpense[]
+
+  @@index([familyId])
+  @@unique([familyId, name])
+}
+
+model AccountEntry {
+  id               String            @id @default(uuid())
+  familyId         String
+  accountCategoryId String
+  entryType        AccountEntryType
+  amount           Decimal           @db.Decimal(12, 2)
+  title            String
+  memo             String?
+  spentAt          DateTime
+  createdByMemberId String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  family           FamilyGroup       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  accountCategory  AccountCategory   @relation(fields: [accountCategoryId], references: [id], onDelete: Restrict)
+  createdByMember  FamilyMember?     @relation(fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  itemAccountLink  ItemAccountLink?
+  eventAccountLink EventAccountLink?
+
+  @@index([familyId])
+  @@index([accountCategoryId])
+  @@index([createdByMemberId])
+  @@index([spentAt])
+}
+
+model FixedExpense {
+  id               String             @id @default(uuid())
+  familyId         String
+  accountCategoryId String?
+  title            String
+  amount           Decimal            @db.Decimal(12, 2)
+  repeatRule       Json?
+  dueDay           Int
+  status           FixedExpenseStatus  @default(ACTIVE)
+  nextDueAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  family           FamilyGroup        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  accountCategory  AccountCategory?   @relation(fields: [accountCategoryId], references: [id], onDelete: SetNull)
+  reminders        FixedExpenseReminder[]
+
+  @@index([familyId])
+  @@index([accountCategoryId])
+  @@index([dueDay])
+}
+
+model FixedExpenseReminder {
+  id              String   @id @default(uuid())
+  fixedExpenseId  String
+  remindAt        DateTime
+  isSent          Boolean  @default(false)
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  fixedExpense    FixedExpense @relation(fields: [fixedExpenseId], references: [id], onDelete: Cascade)
+
+  @@index([fixedExpenseId])
+  @@index([remindAt])
+}
+
+model EventAccountLink {
+  id             String   @id @default(uuid())
+  familyEventId  String
+  accountEntryId String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  familyEvent    FamilyEvent @relation(fields: [familyEventId], references: [id], onDelete: Cascade)
+  accountEntry   AccountEntry @relation(fields: [accountEntryId], references: [id], onDelete: Cascade)
+
+  @@index([familyEventId])
+}
+
+model Notification {
+  id              String             @id @default(uuid())
+  userId          String
+  familyId        String?
+  notificationType NotificationType
+  status          NotificationStatus @default(PENDING)
+  title           String
+  message         String
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  readAt          DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+
+  user            UserAccount        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family          FamilyGroup?       @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([status])
+}
+
+model ActivityLog {
+  id            String        @id @default(uuid())
+  familyId      String
+  actorMemberId String?
+  activityType  ActivityType
+  entityType    String
+  entityId      String
+  title         String
+  message       String?
+  payload       Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  family        FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  actorMember   FamilyMember? @relation("ActivityActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  appreciations Appreciation[]
+
+  @@index([familyId])
+  @@index([actorMemberId])
+  @@index([entityType, entityId])
+}
+
+model Appreciation {
+  id              String            @id @default(uuid())
+  activityId      String
+  fromMemberId    String
+  toMemberId      String
+  appreciationType AppreciationType
+  message         String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  activity        ActivityLog       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  fromMember      FamilyMember      @relation("AppreciationFromMember", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember        FamilyMember      @relation("AppreciationToMember", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@index([fromMemberId])
+  @@index([toMemberId])
+}
