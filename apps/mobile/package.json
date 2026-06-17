@@ -1,0 +1,22 @@
+{
+  "name": "@home-catcher/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint App.tsx",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@babel/runtime": "7.29.7",
+    "@expo/metro-runtime": "~4.0.1",
+    "expo": "~52.0.43",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-web": "~0.19.13"
+  }
+}

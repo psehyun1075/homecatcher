@@ -9,20 +9,53 @@
 - ORM: Prisma
 - Monorepo: pnpm workspace
 
-## 로컬 개발 시작
+## 설치
 ```bash
 pnpm install
+```
+
+## 로컬 실행
+API 서버:
+```bash
+pnpm dev:api
+```
+
+모바일 앱:
+```bash
+pnpm dev:mobile
+```
+
+둘 다 함께 실행:
+```bash
 pnpm dev
 ```
 
-## 권장 개발 순서
-1. 레포 세팅 및 health check
-2. 인증/가족 그룹
-3. 템플릿 빠른 시작
-4. 생필품 + 상품 URL 자동 미리보기
-5. 재주문 + 가계부 기록
-6. 할 일(Todo) + 우리집 매뉴얼
-7. 달력형 가족 캘린더 + 고정지출 알림
-8. 가족 피드 + 고마워요
+## 검증
+```bash
+pnpm build
+pnpm typecheck
+pnpm lint
+```
+
+## API Health Check
+API 서버가 올라오면 아래 엔드포인트로 확인합니다.
+```bash
+curl http://172.16.0.200:3000/api/v1/health
+```
+
+응답 예시:
+```json
+{
+  "status": "ok",
+  "service": "home-catcher-api",
+  "appName": "홈캐처",
+  "version": "0.1.0"
+}
+```
+
+## 환경 변수
+- `API_HOST`: API 서버가 바인딩할 호스트입니다. 기본값은 `0.0.0.0`입니다.
+- `API_PORT`: API 서버 포트입니다. 기본값은 `3000`입니다.
+- `EXPO_PUBLIC_API_BASE_URL`: 모바일 앱이 참고할 API 기본 URL입니다. 로컬 개발에서는 실제 접속 가능한 LAN IP 또는 `localhost`를 사용합니다.
 
 자세한 개발 티켓은 `development_tickets.md`를 확인하세요.
