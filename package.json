@@ -1,0 +1,10 @@
+{
+  "name": "home-catcher",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {}
+}
