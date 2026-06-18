@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "node scripts/prisma-run.cjs generate --schema prisma/schema.prisma",
     "prisma:migrate": "node scripts/prisma-run.cjs migrate dev --schema prisma/schema.prisma",
+    "prisma:seed": "node scripts/prisma-run.cjs seed",
     "prisma:studio": "node scripts/prisma-run.cjs studio --schema prisma/schema.prisma",
     "prisma:reset": "node scripts/prisma-run.cjs migrate reset --force --skip-seed --schema prisma/schema.prisma",
     "postinstall": "node scripts/prisma-run.cjs generate --schema prisma/schema.prisma"
