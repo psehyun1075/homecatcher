@@ -40,7 +40,11 @@ const env = {
   ]),
 };
 
-const result = spawnSync("prisma", process.argv.slice(2), {
+const args = process.argv.slice(2);
+const command = args[0] === "seed" ? "tsx" : "prisma";
+const commandArgs = args[0] === "seed" ? ["prisma/seed.ts", ...args.slice(1)] : args;
+
+const result = spawnSync(command, commandArgs, {
   stdio: "inherit",
   env,
 });

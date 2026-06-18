@@ -46,11 +46,52 @@ curl -X POST "http://localhost:3000/api/v1/invites/$INVITE_CODE/accept" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
+## 템플릿 빠른 시작 예시
+기본 시스템 템플릿을 먼저 seed 합니다.
+
+```bash
+pnpm --filter @home-catcher/api prisma:seed
+```
+
+템플릿 목록을 조회합니다.
+
+```bash
+curl http://localhost:3000/api/v1/templates \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+템플릿 상세를 조회합니다.
+
+```bash
+TEMPLATE_RESPONSE=$(curl -s http://localhost:3000/api/v1/templates \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+
+TEMPLATE_SET_ID=$(echo "$TEMPLATE_RESPONSE" | jq -r '.templates[0].id // .data.templates[0].id')
+
+curl "http://localhost:3000/api/v1/templates/$TEMPLATE_SET_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+가족 그룹에 템플릿을 적용합니다.
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/templates/$TEMPLATE_SET_ID/apply" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+같은 템플릿을 다시 적용하면 `409 Conflict`가 반환됩니다.
+
+```bash
+curl -i -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/templates/$TEMPLATE_SET_ID/apply" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
 ## 테스트용 실행 순서
 ```bash
 pnpm install
 pnpm --filter @home-catcher/api prisma:generate
 pnpm --filter @home-catcher/api prisma:migrate
+pnpm --filter @home-catcher/api prisma:seed
 pnpm typecheck
 pnpm build
 pnpm --filter @home-catcher/api dev

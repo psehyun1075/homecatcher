@@ -136,6 +136,7 @@ model UserAccount {
   familyMembers  FamilyMember[]
   ownedFamilies   FamilyGroup[]
   sessions       UserSession[]
+  templateApplications FamilyTemplateApplication[]
   invitesCreated Invite[]         @relation("InviteCreatedBy")
   acceptedInvites Invite[]
   deviceTokens   DeviceToken[]
@@ -184,6 +185,7 @@ model FamilyGroup {
   calendarViewSettings CalendarViewSetting[]
   notifications        Notification[]
   auditLogs            AuditLog[]
+  templateApplications FamilyTemplateApplication[]
 }
 
 model FamilyMember {
@@ -291,6 +293,7 @@ model AuditLog {
 model TemplateSet {
   id          String             @id @default(uuid())
   slug        String             @unique
+  code        String             @unique
   targetType  TemplateTargetType
   name        String
   description String?
@@ -300,6 +303,7 @@ model TemplateSet {
   deletedAt   DateTime?
 
   items       TemplateItem[]
+  applications FamilyTemplateApplication[]
 }
 
 model TemplateItem {
@@ -316,6 +320,25 @@ model TemplateItem {
   templateSet  TemplateSet      @relation(fields: [templateSetId], references: [id], onDelete: Cascade)
 
   @@index([templateSetId])
+}
+
+model FamilyTemplateApplication {
+  id              String      @id @default(uuid())
+  familyId        String
+  templateSetId   String
+  appliedByUserId String?
+  appliedAt       DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  family          FamilyGroup @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  templateSet     TemplateSet @relation(fields: [templateSetId], references: [id], onDelete: Cascade)
+  appliedBy       UserAccount? @relation(fields: [appliedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([familyId, templateSetId])
+  @@index([familyId])
+  @@index([templateSetId])
+  @@index([appliedByUserId])
 }
 
 model HouseholdItem {
