@@ -3,6 +3,13 @@ import { FamilyRole, Prisma, TodoScheduleType } from "@prisma/client";
 import { createHash } from "crypto";
 
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
+import {
+  addLocalDays,
+  assertValidTimezone,
+  getZonedParts,
+  lastDayOfMonth,
+  zonedTimeToUtc,
+} from "../common/calendar-date.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateTodoCompletionDto } from "./dto/create-todo-completion.dto";
 import { CreateTodoDto } from "./dto/create-todo.dto";
@@ -543,7 +550,7 @@ export class TodosService {
     baseParts: { hour: number; minute: number; second: number; millisecond: number },
     timezone: string,
   ) {
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const lastDay = lastDayOfMonth(year, month);
     const day = Math.min(dayOfMonth, lastDay);
 
     return this.zonedTimeToUtc(
@@ -561,123 +568,22 @@ export class TodosService {
   }
 
   private addLocalDays(date: Date, days: number, timezone: string) {
-    const parts = this.getZonedParts(date, timezone);
-    const localDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
-
-    return this.zonedTimeToUtc(
-      {
-        year: localDate.getUTCFullYear(),
-        month: localDate.getUTCMonth() + 1,
-        day: localDate.getUTCDate(),
-        hour: parts.hour,
-        minute: parts.minute,
-        second: parts.second,
-        millisecond: parts.millisecond,
-      },
-      timezone,
-    );
+    return addLocalDays(date, days, timezone);
   }
 
   private assertValidTimezone(timezone: string) {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
-    } catch {
-      throw new BadRequestException("시간대를 다시 확인해 주세요.");
-    }
+    assertValidTimezone(timezone);
   }
 
   private getZonedParts(date: Date, timezone: string) {
-    this.assertValidTimezone(timezone);
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      calendar: "gregory",
-      numberingSystem: "latn",
-      hourCycle: "h23",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      weekday: "short",
-    });
-    const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
-    const dayOfWeekMap: Record<string, number> = {
-      Sun: 0,
-      Mon: 1,
-      Tue: 2,
-      Wed: 3,
-      Thu: 4,
-      Fri: 5,
-      Sat: 6,
-    };
-
-    return {
-      year: Number(parts.year),
-      month: Number(parts.month),
-      day: Number(parts.day),
-      hour: Number(parts.hour),
-      minute: Number(parts.minute),
-      second: Number(parts.second),
-      millisecond: date.getUTCMilliseconds(),
-      dayOfWeek: dayOfWeekMap[parts.weekday ?? "Sun"] ?? 0,
-    };
+    return getZonedParts(date, timezone);
   }
 
   private zonedTimeToUtc(
     localTime: { year: number; month: number; day: number; hour: number; minute: number; second: number; millisecond: number },
     timezone: string,
   ) {
-    const utcGuess = Date.UTC(
-      localTime.year,
-      localTime.month - 1,
-      localTime.day,
-      localTime.hour,
-      localTime.minute,
-      localTime.second,
-      localTime.millisecond,
-    );
-
-    return this.resolveZonedTime(utcGuess, localTime, timezone);
-  }
-
-  private resolveZonedTime(
-    utcGuess: number,
-    localTime: { year: number; month: number; day: number; hour: number; minute: number; second: number; millisecond: number },
-    timezone: string,
-  ) {
-    let resolved = utcGuess;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const zonedParts = this.getZonedParts(new Date(resolved), timezone);
-      const zonedAsUtc = Date.UTC(
-        zonedParts.year,
-        zonedParts.month - 1,
-        zonedParts.day,
-        zonedParts.hour,
-        zonedParts.minute,
-        zonedParts.second,
-        localTime.millisecond,
-      );
-      const wantedAsUtc = Date.UTC(
-        localTime.year,
-        localTime.month - 1,
-        localTime.day,
-        localTime.hour,
-        localTime.minute,
-        localTime.second,
-        localTime.millisecond,
-      );
-      const diff = zonedAsUtc - wantedAsUtc;
-
-      if (diff === 0) {
-        break;
-      }
-
-      resolved -= diff;
-    }
-
-    return new Date(resolved);
+    return zonedTimeToUtc(localTime, timezone);
   }
 
   private createCompletionPayloadHash(todoId: string, dto: CreateTodoCompletionDto) {

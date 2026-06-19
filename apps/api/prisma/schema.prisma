@@ -77,7 +77,22 @@ enum EventType {
   SCHOOL
   HEALTH
   BIRTHDAY
+  TRAVEL
+  VACATION
+  BUSINESS_TRIP
+  FAMILY_EVENT
+  CHILD_EVENT
+  SOCIAL_EVENT
+  MEDICAL
   OTHER
+}
+
+enum RecurrenceType {
+  ONCE
+  WEEKLY
+  MONTHLY
+  YEARLY
+  INTERVAL_DAYS
 }
 
 enum AccountEntryType {
@@ -197,6 +212,7 @@ model FamilyGroup {
   accountCategories    AccountCategory[]
   accountEntries       AccountEntry[]
   fixedExpenses        FixedExpense[]
+  fixedExpensePayments FixedExpensePayment[]
   activityLogs         ActivityLog[]
   calendarViewSettings CalendarViewSetting[]
   notifications        Notification[]
@@ -222,6 +238,9 @@ model FamilyMember {
   createdTodoTasks TodoTask[] @relation("TodoCreatedBy")
   completions  TodoCompletion[]
   createdHomeManuals HomeManual[] @relation("HomeManualCreatedBy")
+  createdFamilyEvents FamilyEvent[] @relation("FamilyEventCreatedBy")
+  createdFixedExpenses FixedExpense[] @relation("FixedExpenseCreatedBy")
+  fixedExpensePayments FixedExpensePayment[]
   purchasedItems ItemPurchaseLog[] @relation("ItemPurchasedBy")
   actedActivities ActivityLog[] @relation("ActivityActor")
   eventParticipants EventParticipant[]
@@ -612,23 +631,32 @@ model ManualRelation {
 model FamilyEvent {
   id             String     @id @default(uuid())
   familyId       String
+  createdByMemberId String?
   eventType      EventType
   title          String
   description    String?
   location       String?
   startAt        DateTime
   endAt          DateTime?
+  allDay         Boolean    @default(false)
+  timezone       String     @default("Asia/Seoul")
   displayColor   String?
+  recurrenceType RecurrenceType @default(ONCE)
+  recurrenceRule Json?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
 
   family         FamilyGroup     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember?  @relation("FamilyEventCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
   participants   EventParticipant[]
   eventAccountLinks EventAccountLink[]
 
   @@index([familyId])
+  @@index([createdByMemberId])
+  @@index([eventType])
   @@index([startAt])
+  @@index([deletedAt])
 }
 
 model EventParticipant {
@@ -707,6 +735,7 @@ model AccountEntry {
   createdByMember  FamilyMember?     @relation(fields: [createdByMemberId], references: [id], onDelete: SetNull)
   itemAccountLink  ItemAccountLink?
   eventAccountLink EventAccountLink?
+  fixedExpensePayment FixedExpensePayment?
 
   @@index([familyId])
   @@index([accountCategoryId])
@@ -717,9 +746,21 @@ model AccountEntry {
 model FixedExpense {
   id               String             @id @default(uuid())
   familyId         String
+  createdByMemberId String?
   accountCategoryId String?
   title            String
   amount           Decimal            @db.Decimal(12, 2)
+  currency         String             @default("KRW")
+  recurrenceType   RecurrenceType      @default(MONTHLY)
+  dayOfMonth       Int?
+  dayOfWeek        Int?
+  intervalValue    Int?
+  startDate        DateTime?
+  endDate          DateTime?
+  dueTime          String?
+  timezone         String             @default("Asia/Seoul")
+  memo             String?
+  isActive         Boolean            @default(true)
   repeatRule       Json?
   dueDay           Int
   status           FixedExpenseStatus  @default(ACTIVE)
@@ -729,17 +770,26 @@ model FixedExpense {
   deletedAt        DateTime?
 
   family           FamilyGroup        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember  FamilyMember?      @relation("FixedExpenseCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
   accountCategory  AccountCategory?   @relation(fields: [accountCategoryId], references: [id], onDelete: SetNull)
   reminders        FixedExpenseReminder[]
+  payments         FixedExpensePayment[]
 
   @@index([familyId])
+  @@index([createdByMemberId])
   @@index([accountCategoryId])
   @@index([dueDay])
+  @@index([recurrenceType])
+  @@index([isActive])
+  @@index([deletedAt])
 }
 
 model FixedExpenseReminder {
   id              String   @id @default(uuid())
   fixedExpenseId  String
+  daysBefore      Int      @default(0)
+  remindTime      String   @default("09:00")
+  enabled         Boolean  @default(true)
   remindAt        DateTime
   isSent          Boolean  @default(false)
   sentAt          DateTime?
@@ -751,6 +801,36 @@ model FixedExpenseReminder {
 
   @@index([fixedExpenseId])
   @@index([remindAt])
+  @@unique([fixedExpenseId, daysBefore])
+}
+
+model FixedExpensePayment {
+  id                 String       @id @default(uuid())
+  requestId          String       @unique
+  requestPayloadHash String?
+  fixedExpenseId     String
+  familyId           String
+  dueDate            DateTime
+  paidAt             DateTime
+  amount             Decimal      @db.Decimal(12, 2)
+  currency           String       @default("KRW")
+  paidByMemberId     String?
+  accountEntryId     String       @unique
+  note               String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  fixedExpense       FixedExpense @relation(fields: [fixedExpenseId], references: [id], onDelete: Cascade)
+  family             FamilyGroup  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  paidByMember       FamilyMember? @relation(fields: [paidByMemberId], references: [id], onDelete: SetNull)
+  accountEntry       AccountEntry @relation(fields: [accountEntryId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([fixedExpenseId])
+  @@index([paidByMemberId])
+  @@index([dueDate])
+  @@unique([fixedExpenseId, dueDate])
 }
 
 model EventAccountLink {
