@@ -314,6 +314,189 @@ curl -i "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchas
   -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
 ```
 
+## 할 일(Todo)과 우리집 매뉴얼 예시
+할 일은 제목만으로 만들 수 있습니다.
+
+```bash
+TODO_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/todos" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"분리수거"}')
+
+TODO_ID=$(echo "$TODO_RESPONSE" | jq -r '.todo.id')
+```
+
+담당자와 반복 설정이 있는 할 일을 생성합니다.
+
+```bash
+MEMBERS_RESPONSE=$(curl -s "http://localhost:3000/api/v1/families/$FAMILY_ID/members" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+
+MEMBER_ID=$(echo "$MEMBERS_RESPONSE" | jq -r '.members[0].id')
+
+REPEAT_TODO_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/todos" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"title\": \"화장실 청소\",
+    \"description\": \"세면대와 변기를 청소하고 마지막에 환기해요.\",
+    \"category\": \"청소\",
+    \"priority\": 2,
+    \"estimatedMinutes\": 20,
+    \"plannerMemberId\": \"$MEMBER_ID\",
+    \"assigneeMemberId\": \"$MEMBER_ID\",
+    \"schedule\": {
+      \"scheduleType\": \"WEEKLY\",
+      \"intervalValue\": 1,
+      \"daysOfWeek\": [6],
+      \"startAt\": \"2026-06-20T09:00:00+09:00\",
+      \"endAt\": null,
+      \"timezone\": \"Asia/Seoul\"
+    }
+  }")
+
+REPEAT_TODO_ID=$(echo "$REPEAT_TODO_RESPONSE" | jq -r '.todo.id')
+```
+
+할 일 목록, 상세, 수정, 반복 일정을 조회합니다.
+
+```bash
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/todos?page=1&limit=20&category=청소&completed=false" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X PATCH "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"estimatedMinutes":25}'
+
+curl "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID/schedule" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+`completed=true`는 최종 완료된 단발성 할 일(Todo)을 의미합니다. 활성 반복 Todo는 완료 이력이 있어도 다음 예정일로 계속 관리되므로 `completed=false` 목록에 포함됩니다.
+
+할 일을 완료합니다. 같은 `requestId`와 같은 완료 payload는 기존 완료 기록을 반환하고, 다른 payload면 `409 Conflict`가 반환됩니다.
+
+```bash
+TODO_COMPLETION_REQUEST_ID="$(uuidgen)"
+
+COMPLETION_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID/completions" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$TODO_COMPLETION_REQUEST_ID\",
+    \"completedAt\": \"2026-06-20T10:30:00+09:00\",
+    \"note\": \"청소하고 20분 환기했어요.\"
+  }")
+
+COMPLETION_ID=$(echo "$COMPLETION_RESPONSE" | jq -r '.completion.id')
+
+curl -X POST "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID/completions" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$TODO_COMPLETION_REQUEST_ID\",
+    \"completedAt\": \"2026-06-20T10:30:00+09:00\",
+    \"note\": \"청소하고 20분 환기했어요.\"
+  }"
+
+curl "http://localhost:3000/api/v1/todo-completions/$COMPLETION_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID/schedule" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+우리집 매뉴얼을 만들고 단계를 관리합니다.
+
+```bash
+MANUAL_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/home-manuals" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "아기 세탁 방법",
+    "category": "육아",
+    "description": "아기 옷과 손수건은 따로 세탁해요.",
+    "isPinned": true,
+    "steps": [
+      { "title": "아기 옷과 손수건을 분리해요.", "sortOrder": 1 },
+      { "title": "저자극 세제를 사용해요.", "description": "섬유유연제는 사용하지 않아요.", "sortOrder": 2 }
+    ]
+  }')
+
+MANUAL_ID=$(echo "$MANUAL_RESPONSE" | jq -r '.homeManual.id')
+STEP_ID=$(echo "$MANUAL_RESPONSE" | jq -r '.homeManual.steps[0].id')
+
+curl -X POST "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID/steps" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"햇볕에 말려요."}'
+
+curl -X PATCH "http://localhost:3000/api/v1/manual-steps/$STEP_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"아기 옷과 손수건을 먼저 분리해요.","sortOrder":1}'
+
+STEP_IDS=$(curl -s "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID/steps" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -c '[.steps[].id]')
+
+curl -X PUT "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID/steps/reorder" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"stepIds\":$STEP_IDS}"
+```
+
+매뉴얼을 생필품 또는 할 일과 연결합니다.
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID/relations" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"targetType\": \"HOUSEHOLD_ITEM\",
+    \"householdItemId\": \"$HOUSEHOLD_ITEM_ID\",
+    \"todoTaskId\": null,
+    \"note\": \"기저귀 재고 확인할 때 같이 봐요.\"
+  }"
+
+curl -X POST "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID/relations" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"targetType\": \"TODO\",
+    \"householdItemId\": null,
+    \"todoTaskId\": \"$REPEAT_TODO_ID\",
+    \"note\": null
+  }"
+
+curl "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+`MEMBER`는 자신이 만든 할 일/우리집 매뉴얼만 수정·삭제할 수 있고, 외부인은 접근할 수 없습니다.
+템플릿으로 생성된 할 일(Todo)과 우리집 매뉴얼은 템플릿을 적용한 구성원이 만든 데이터로 기록되며, OWNER/ADMIN은 수정·삭제할 수 있고 일반 MEMBER는 본인이 만든 경우에만 수정·삭제할 수 있습니다.
+
+```bash
+curl -i -X PATCH "http://localhost:3000/api/v1/todos/$REPEAT_TODO_ID" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"권한 확인"}'
+
+curl -i -X PATCH "http://localhost:3000/api/v1/home-manuals/$MANUAL_ID" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"권한 확인"}'
+
+curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/todos" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+
+curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/home-manuals" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+```
+
 다른 가족 구성원이 아닌 사용자는 `403 Forbidden`이 반환됩니다.
 
 ```bash
