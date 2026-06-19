@@ -66,6 +66,7 @@ enum TodoScheduleType {
   DAILY
   WEEKLY
   MONTHLY
+  INTERVAL_DAYS
   CUSTOM
 }
 
@@ -218,7 +219,9 @@ model FamilyMember {
   user         UserAccount?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   plannerTasks TodoTask[]    @relation("TodoPlanner")
   assigneeTasks TodoTask[]   @relation("TodoAssignee")
+  createdTodoTasks TodoTask[] @relation("TodoCreatedBy")
   completions  TodoCompletion[]
+  createdHomeManuals HomeManual[] @relation("HomeManualCreatedBy")
   purchasedItems ItemPurchaseLog[] @relation("ItemPurchasedBy")
   actedActivities ActivityLog[] @relation("ActivityActor")
   eventParticipants EventParticipant[]
@@ -377,6 +380,7 @@ model HouseholdItem {
   productLinks  ProductLink[]
   purchaseRule  ItemPurchaseRule?
   purchaseLogs  ItemPurchaseLog[]
+  manualRelations ManualRelation[]
 
   @@index([familyId])
   @@index([createdByUserId])
@@ -469,24 +473,33 @@ model ItemAccountLink {
 model TodoTask {
   id                String    @id @default(uuid())
   familyId          String
+  createdByMemberId String?
   title             String
   description       String?
+  category          String?
+  priority          Int?
+  estimatedMinutes  Int?
   plannerMemberId   String?
   assigneeMemberId  String?
   isActive          Boolean   @default(true)
+  completedAt       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
   family            FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember   FamilyMember? @relation("TodoCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
   plannerMember     FamilyMember? @relation("TodoPlanner", fields: [plannerMemberId], references: [id], onDelete: SetNull)
   assigneeMember    FamilyMember? @relation("TodoAssignee", fields: [assigneeMemberId], references: [id], onDelete: SetNull)
   schedules         TodoSchedule[]
   completions       TodoCompletion[]
+  manualRelations   ManualRelation[]
 
   @@index([familyId])
+  @@index([createdByMemberId])
   @@index([plannerMemberId])
   @@index([assigneeMemberId])
+  @@index([completedAt])
 }
 
 model TodoSchedule {
@@ -495,6 +508,7 @@ model TodoSchedule {
   scheduleType   TodoScheduleType
   repeatRule     Json?
   nextDueAt      DateTime?
+  timezone       String           @default("Asia/Seoul")
   isEnabled      Boolean          @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -508,6 +522,8 @@ model TodoSchedule {
 
 model TodoCompletion {
   id                String   @id @default(uuid())
+  requestId         String   @unique
+  requestPayloadHash String?
   todoTaskId        String
   completedByMemberId String?
   completedAt       DateTime @default(now())
@@ -521,11 +537,13 @@ model TodoCompletion {
 
   @@index([todoTaskId])
   @@index([completedByMemberId])
+  @@index([requestId])
 }
 
 model HomeManual {
   id          String   @id @default(uuid())
   familyId    String
+  createdByMemberId String?
   title       String
   category    String?
   description String?
@@ -535,10 +553,12 @@ model HomeManual {
   deletedAt   DateTime?
 
   family      FamilyGroup   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByMember FamilyMember? @relation("HomeManualCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
   steps       ManualStep[]
   relations   ManualRelation[]
 
   @@index([familyId])
+  @@index([createdByMemberId])
 }
 
 model ManualStep {
@@ -564,21 +584,29 @@ model ManualStep {
 model ManualRelation {
   id              String   @id @default(uuid())
   homeManualId    String
-  fromStepId      String
-  toStepId        String
+  fromStepId      String?
+  toStepId        String?
+  targetType      String?
+  householdItemId String?
+  todoTaskId      String?
   relationKind    String?
+  note            String?
   sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
 
   homeManual      HomeManual   @relation(fields: [homeManualId], references: [id], onDelete: Cascade)
-  fromStep        ManualStep   @relation("ManualStepFrom", fields: [fromStepId], references: [id], onDelete: Cascade)
-  toStep          ManualStep   @relation("ManualStepTo", fields: [toStepId], references: [id], onDelete: Cascade)
+  fromStep        ManualStep?  @relation("ManualStepFrom", fields: [fromStepId], references: [id], onDelete: Cascade)
+  toStep          ManualStep?  @relation("ManualStepTo", fields: [toStepId], references: [id], onDelete: Cascade)
+  householdItem   HouseholdItem? @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+  todoTask        TodoTask? @relation(fields: [todoTaskId], references: [id], onDelete: Cascade)
 
   @@index([homeManualId])
   @@index([fromStepId])
   @@index([toStepId])
+  @@index([householdItemId])
+  @@index([todoTaskId])
 }
 
 model FamilyEvent {

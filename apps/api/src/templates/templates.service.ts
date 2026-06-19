@@ -202,6 +202,7 @@ export class TemplatesService {
           const todoTask = await tx.todoTask.create({
             data: {
               familyId,
+              createdByMemberId: membership.id,
               title: item.title,
               description: payload.description,
             },
@@ -215,6 +216,7 @@ export class TemplatesService {
                 scheduleType: payload.schedule.scheduleType ?? TodoScheduleType.WEEKLY,
                 repeatRule: payload.schedule.repeatRule ?? Prisma.JsonNull,
                 nextDueAt: payload.schedule.nextDueAt ? new Date(payload.schedule.nextDueAt) : null,
+                timezone: "Asia/Seoul",
               },
             });
             createdCounts.todoSchedules += 1;
@@ -226,6 +228,7 @@ export class TemplatesService {
           const homeManual = await tx.homeManual.create({
             data: {
               familyId,
+              createdByMemberId: membership.id,
               title: item.title,
               category: payload.category,
               description: payload.description,
