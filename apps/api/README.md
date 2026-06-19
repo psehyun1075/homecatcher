@@ -511,6 +511,153 @@ curl -i -X POST "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID
   -d '{"url":"https://example.com/product/123"}'
 ```
 
+## 가족 캘린더와 고정지출 알림 예시
+가족 여행/출장 일정을 만들고 월간 달력에서 조회합니다.
+
+```bash
+MEMBER_ID=$(curl -s "http://localhost:3000/api/v1/families/$FAMILY_ID/members" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.members[0].id')
+
+EVENT_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/events" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"title\": \"제주도 가족여행\",
+    \"description\": \"여름 가족여행\",
+    \"eventType\": \"TRAVEL\",
+    \"location\": \"제주도\",
+    \"startAt\": \"2026-07-10T09:00:00+09:00\",
+    \"endAt\": \"2026-07-13T18:00:00+09:00\",
+    \"allDay\": false,
+    \"timezone\": \"Asia/Seoul\",
+    \"displayColor\": \"#67A57A\",
+    \"participantMemberIds\": [\"$MEMBER_ID\"]
+  }")
+
+EVENT_ID=$(echo "$EVENT_RESPONSE" | jq -r '.event.id')
+
+curl -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/events" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "부산 출장",
+    "eventType": "BUSINESS_TRIP",
+    "location": "부산",
+    "startAt": "2026-07-21T08:00:00+09:00",
+    "endAt": "2026-07-22T19:00:00+09:00",
+    "timezone": "Asia/Seoul"
+  }'
+
+curl "http://localhost:3000/api/v1/events/$EVENT_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+월간 가족 캘린더와 특정 날짜 상세를 조회합니다. 일정, Todo, 고정지출, 생필품 소진 예정이 일정 칩 형태로 함께 반환됩니다.
+
+```bash
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/calendar/month?month=2026-07&timezone=Asia/Seoul&types=FAMILY_EVENT,TODO,FIXED_EXPENSE,HOUSEHOLD_ITEM" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/calendar/day?date=2026-07-10&timezone=Asia/Seoul" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+고정지출을 만들고 알림 규칙을 조회·수정합니다. 실제 푸시/인앱 알림 발송이나 Notification 예약 생성은 하지 않습니다.
+
+```bash
+FIXED_EXPENSE_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/fixed-expenses" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "월세",
+    "amount": 850000,
+    "currency": "KRW",
+    "categoryId": null,
+    "recurrenceType": "MONTHLY",
+    "dayOfMonth": 25,
+    "startDate": "2026-01-01",
+    "dueTime": "09:00",
+    "timezone": "Asia/Seoul",
+    "memo": "매월 25일",
+    "reminders": [
+      { "daysBefore": 3, "remindTime": "09:00", "enabled": true },
+      { "daysBefore": 0, "remindTime": "09:00", "enabled": true }
+    ]
+  }')
+
+FIXED_EXPENSE_ID=$(echo "$FIXED_EXPENSE_RESPONSE" | jq -r '.fixedExpense.id')
+
+curl "http://localhost:3000/api/v1/fixed-expenses/$FIXED_EXPENSE_ID/reminders" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X PUT "http://localhost:3000/api/v1/fixed-expenses/$FIXED_EXPENSE_ID/reminders" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reminders":[{"daysBefore":1,"remindTime":"08:30","enabled":true}]}'
+```
+
+고정지출을 납부 완료로 기록하면 같은 transaction에서 가계부 지출이 생성됩니다. 같은 `requestId`와 같은 payload는 기존 결과를 반환하고, 다른 payload면 `409 Conflict`가 반환됩니다.
+
+```bash
+PAYMENT_REQUEST_ID="$(uuidgen)"
+
+PAYMENT_RESPONSE=$(curl -s -X POST "http://localhost:3000/api/v1/fixed-expenses/$FIXED_EXPENSE_ID/payments" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$PAYMENT_REQUEST_ID\",
+    \"dueDate\": \"2026-07-25\",
+    \"paidAt\": \"2026-07-25T09:10:00+09:00\",
+    \"amount\": 850000,
+    \"currency\": \"KRW\",
+    \"note\": \"7월 월세 납부\"
+  }")
+
+ACCOUNT_ENTRY_ID=$(echo "$PAYMENT_RESPONSE" | jq -r '.payment.accountEntryId')
+
+curl "http://localhost:3000/api/v1/accountbook/entries/$ACCOUNT_ENTRY_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X POST "http://localhost:3000/api/v1/fixed-expenses/$FIXED_EXPENSE_ID/payments" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$PAYMENT_REQUEST_ID\",
+    \"dueDate\": \"2026-07-25\",
+    \"paidAt\": \"2026-07-25T09:10:00+09:00\",
+    \"amount\": 850000,
+    \"currency\": \"KRW\",
+    \"note\": \"7월 월세 납부\"
+  }"
+```
+
+동일 `fixedExpenseId + dueDate`를 다른 `requestId`로 재납부하면 `409 Conflict`가 반환됩니다. `MEMBER`는 고정지출 생성·수정·삭제를 할 수 없고, 외부인은 가족 캘린더와 고정지출에 접근할 수 없습니다.
+
+```bash
+curl -i -X POST "http://localhost:3000/api/v1/fixed-expenses/$FIXED_EXPENSE_ID/payments" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$(uuidgen)\",
+    \"dueDate\": \"2026-07-25\",
+    \"amount\": 850000
+  }"
+
+curl -i -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/fixed-expenses" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"월세","amount":850000,"recurrenceType":"MONTHLY","dayOfMonth":25,"startDate":"2026-01-01"}'
+
+curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/calendar/month?month=2026-07" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+```
+
+반복 가능한 smoke test는 API 서버를 3003 포트로 실행한 뒤 아래처럼 실행합니다.
+
+```bash
+API_BASE_URL="http://127.0.0.1:3003/api/v1" apps/api/scripts/smoke/t008-calendar-fixed-expenses.sh
+```
+
 ## 테스트용 실행 순서
 ```bash
 pnpm install
