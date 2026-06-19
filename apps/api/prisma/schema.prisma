@@ -51,6 +51,14 @@ enum MetadataStatus {
   PARTIAL
   FAILED
   TIMEOUT
+  UNSUPPORTED
+}
+
+enum MetadataSource {
+  OPEN_GRAPH
+  JSON_LD
+  TITLE
+  NONE
 }
 
 enum TodoScheduleType {
@@ -137,6 +145,7 @@ model UserAccount {
   ownedFamilies   FamilyGroup[]
   sessions       UserSession[]
   templateApplications FamilyTemplateApplication[]
+  createdHouseholdItems HouseholdItem[]
   invitesCreated Invite[]         @relation("InviteCreatedBy")
   acceptedInvites Invite[]
   deviceTokens   DeviceToken[]
@@ -344,8 +353,10 @@ model FamilyTemplateApplication {
 model HouseholdItem {
   id            String   @id @default(uuid())
   familyId      String
+  createdByUserId String?
   name          String
   category      String?
+  unit          String?
   memo          String?
   minStock      Int?
   cycleDays     Int?
@@ -354,11 +365,13 @@ model HouseholdItem {
   deletedAt     DateTime?
 
   family        FamilyGroup      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdBy     UserAccount?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   productLinks  ProductLink[]
   purchaseRule  ItemPurchaseRule?
   purchaseLogs  ItemPurchaseLog[]
 
   @@index([familyId])
+  @@index([createdByUserId])
   @@index([familyId, name])
 }
 
@@ -370,8 +383,11 @@ model ProductLink {
   productImageUrl String?
   mallName        String?
   lastPrice       Decimal?       @db.Decimal(12, 2)
+  currency        String?
   metadataStatus  MetadataStatus  @default(TIMEOUT)
+  metadataSource  MetadataSource  @default(NONE)
   previewedAt     DateTime?
+  isPrimary       Boolean        @default(false)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   deletedAt       DateTime?
