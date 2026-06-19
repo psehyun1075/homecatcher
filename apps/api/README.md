@@ -159,6 +159,161 @@ curl "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/reorder-pr
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
+## 생필품 재주문 완료와 가계부 연동 예시
+구매 규칙을 저장하고 조회합니다. `PUT`은 `OWNER` 또는 `ADMIN`만 사용할 수 있습니다.
+
+```bash
+curl -X PUT "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchase-rule" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "exactOnly": true,
+    "substitutionPolicy": "NOT_ALLOWED",
+    "priceLimit": 50000,
+    "deliveryCondition": "내일 도착이면 좋아요",
+    "reorderThreshold": 1,
+    "approvalRequiredAbove": 50000,
+    "note": "같은 브랜드 4단계만 주문해요"
+  }'
+
+curl "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchase-rule" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+`approvalRequiredAbove`는 API 요청/응답 필드명이며 DB 내부에서는 기존 `approvalThreshold` 필드에 저장됩니다.
+
+재주문 미리보기에서 상품 URL, 최근 실제 구매 금액, 구매 규칙, 확인 필요 여부를 함께 조회합니다.
+
+```bash
+curl "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/reorder-preview" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+쇼핑몰에서 주문한 뒤 앱으로 돌아와 구매 완료를 기록합니다. 같은 `requestId`를 다시 보내도 구매 기록과 가계부 기록은 중복 생성되지 않습니다.
+
+```bash
+REQUEST_ID="$(uuidgen)"
+
+curl -X POST "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$REQUEST_ID\",
+    \"productLinkId\": \"$PRODUCT_LINK_ID\",
+    \"quantity\": 2,
+    \"unitPrice\": 18400,
+    \"totalAmount\": 36800,
+    \"currency\": \"KRW\",
+    \"purchasedAt\": \"2026-06-18T10:00:00+09:00\",
+    \"stockAfterPurchase\": 2,
+    \"note\": \"기저귀 2팩 주문\",
+    \"confirmRuleOverride\": false
+  }"
+
+curl -X POST "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$REQUEST_ID\",
+    \"productLinkId\": \"$PRODUCT_LINK_ID\",
+    \"quantity\": 2,
+    \"unitPrice\": 18400,
+    \"totalAmount\": 36800,
+    \"currency\": \"KRW\"
+  }"
+```
+
+구매 기록 목록과 상세를 조회합니다.
+
+```bash
+PURCHASES_RESPONSE=$(curl -s "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+
+PURCHASE_ID=$(echo "$PURCHASES_RESPONSE" | jq -r '.purchases[0].id // .data.purchases[0].id')
+
+curl "http://localhost:3000/api/v1/purchases/$PURCHASE_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+가계부 기본 카테고리는 가족별로 자동 준비됩니다. 생필품 구매는 `HOUSEHOLD_SUPPLIES` 카테고리 지출로 연결됩니다.
+
+```bash
+CATEGORIES_RESPONSE=$(curl -s "http://localhost:3000/api/v1/families/$FAMILY_ID/accountbook/categories" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+
+HOUSEHOLD_SUPPLIES_CATEGORY_ID=$(echo "$CATEGORIES_RESPONSE" | jq -r '.categories[] | select(.code=="HOUSEHOLD_SUPPLIES") | .id')
+FOOD_CATEGORY_ID=$(echo "$CATEGORIES_RESPONSE" | jq -r '.categories[] | select(.code=="FOOD") | .id')
+```
+
+가계부를 직접 입력하고 월간 요약을 조회합니다.
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/families/$FAMILY_ID/accountbook/entries" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"categoryId\": \"$FOOD_CATEGORY_ID\",
+    \"entryType\": \"EXPENSE\",
+    \"amount\": 45000,
+    \"currency\": \"KRW\",
+    \"occurredAt\": \"2026-06-18T10:00:00+09:00\",
+    \"title\": \"장보기\",
+    \"memo\": \"주말 식재료\"
+  }"
+
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/accountbook/entries?month=2026-06&page=1&limit=20" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/accountbook/monthly-summary?month=2026-06" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+가격 제한을 넘었는데 확인하지 않으면 `409 Conflict`가 반환됩니다. `MEMBER`가 `confirmRuleOverride=true`로 우회하려고 하면 `403 Forbidden`이 반환됩니다.
+
+```bash
+curl -i -X POST "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$(uuidgen)\",
+    \"totalAmount\": 70000,
+    \"currency\": \"KRW\",
+    \"confirmRuleOverride\": false
+  }"
+
+MEMBER_ACCESS_TOKEN="<memberAccessToken>"
+
+curl -i -X POST "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"requestId\": \"$(uuidgen)\",
+    \"totalAmount\": 70000,
+    \"currency\": \"KRW\",
+    \"confirmRuleOverride\": true
+  }"
+```
+
+`MEMBER`는 자신이 만든 가계부 기록만 수정/삭제할 수 있고, 외부인은 생필품 구매와 가계부 모두 접근할 수 없습니다.
+
+```bash
+ACCOUNT_ENTRY_ID="<accountEntryId>"
+
+curl -i -X PATCH "http://localhost:3000/api/v1/accountbook/entries/$ACCOUNT_ENTRY_ID" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"memo":"내가 만든 기록이 아니면 403"}'
+
+curl -i -X DELETE "http://localhost:3000/api/v1/accountbook/entries/$ACCOUNT_ENTRY_ID" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN"
+
+curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/accountbook/categories" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+
+curl -i "http://localhost:3000/api/v1/household-items/$HOUSEHOLD_ITEM_ID/purchases" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+```
+
 다른 가족 구성원이 아닌 사용자는 `403 Forbidden`이 반환됩니다.
 
 ```bash

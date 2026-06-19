@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
 
 import { CurrentUser, CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -6,6 +6,7 @@ import { CreateHouseholdItemDto } from "./dto/create-household-item.dto";
 import { FamilyHouseholdItemsParamDto } from "./dto/family-household-items-param.dto";
 import { HouseholdItemIdParamDto } from "./dto/household-item-id-param.dto";
 import { UpdateHouseholdItemDto } from "./dto/update-household-item.dto";
+import { UpsertPurchaseRuleDto } from "./dto/upsert-purchase-rule.dto";
 import { HouseholdItemsService } from "./household-items.service";
 
 @UseGuards(JwtAuthGuard)
@@ -44,5 +45,19 @@ export class HouseholdItemsController {
   @Delete("household-items/:itemId")
   deleteItem(@CurrentUser() user: CurrentUserPayload, @Param() params: HouseholdItemIdParamDto) {
     return this.householdItemsService.deleteItem(user, params.itemId);
+  }
+
+  @Get("household-items/:itemId/purchase-rule")
+  getPurchaseRule(@CurrentUser() user: CurrentUserPayload, @Param() params: HouseholdItemIdParamDto) {
+    return this.householdItemsService.getPurchaseRule(user, params.itemId);
+  }
+
+  @Put("household-items/:itemId/purchase-rule")
+  upsertPurchaseRule(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param() params: HouseholdItemIdParamDto,
+    @Body() dto: UpsertPurchaseRuleDto,
+  ) {
+    return this.householdItemsService.upsertPurchaseRule(user, params.itemId, dto);
   }
 }

@@ -128,6 +128,24 @@ export class ProductLinksService {
       item.productLinks.find((link) => link.isPrimary) ??
       item.productLinks.find((link) => link.deletedAt === null) ??
       null;
+    const latestPurchase = await this.prisma.itemPurchaseLog.findFirst({
+      where: {
+        householdItemId: item.id,
+        deletedAt: null,
+      },
+      orderBy: [{ purchasedAt: "desc" }, { createdAt: "desc" }],
+    });
+    const previewPrice = primaryLink?.lastPrice ?? null;
+    const latestAmount = latestPurchase?.amount ?? null;
+    const comparisonAmount = previewPrice ?? latestAmount;
+    const exceedsPriceLimit =
+      comparisonAmount !== null && item.purchaseRule?.priceLimit
+        ? comparisonAmount.gt(item.purchaseRule.priceLimit)
+        : false;
+    const requiresApproval =
+      comparisonAmount !== null && item.purchaseRule?.approvalThreshold
+        ? comparisonAmount.gt(item.purchaseRule.approvalThreshold)
+        : false;
 
     return {
       reorderPreview: {
@@ -139,6 +157,8 @@ export class ProductLinksService {
           minStock: item.minStock,
           cycleDays: item.cycleDays,
           memo: item.memo,
+          lastPurchasedAt: item.lastPurchasedAt,
+          nextEstimatedRunOutAt: item.nextEstimatedRunOutAt,
         },
         primaryProductLink: primaryLink
           ? {
@@ -154,15 +174,18 @@ export class ProductLinksService {
               fetchedAt: primaryLink.previewedAt,
             }
           : null,
-        purchaseRule: item.purchaseRule
-          ? {
-              exactOnly: item.purchaseRule.exactOnly,
-              priceLimit: item.purchaseRule.priceLimit === null ? null : Number(item.purchaseRule.priceLimit),
-              approvalThreshold:
-                item.purchaseRule.approvalThreshold === null ? null : Number(item.purchaseRule.approvalThreshold),
-              preferredMallName: item.purchaseRule.preferredMallName,
-            }
-          : null,
+        itemName: item.name,
+        representativeProductUrl: primaryLink?.url ?? null,
+        productName: primaryLink?.productName ?? null,
+        productImageUrl: primaryLink?.productImageUrl ?? null,
+        mallName: primaryLink?.mallName ?? null,
+        previewPrice: previewPrice === null ? null : Number(previewPrice),
+        recentPurchaseAmount: latestAmount === null ? null : Number(latestAmount),
+        purchaseRule: item.purchaseRule ? this.householdItemsService.serializePurchaseRule(item.purchaseRule) : null,
+        exceedsPriceLimit,
+        requiresApprovalOrConfirmation: exceedsPriceLimit || requiresApproval,
+        lastPurchasedAt: latestPurchase?.purchasedAt ?? item.lastPurchasedAt,
+        nextEstimatedRunOutAt: item.nextEstimatedRunOutAt,
       },
     };
   }
