@@ -86,6 +86,12 @@ enum AccountEntryType {
   ADJUSTMENT
 }
 
+enum SubstitutionPolicy {
+  NOT_ALLOWED
+  SAME_BRAND
+  ANY
+}
+
 enum FixedExpenseStatus {
   ACTIVE
   PAUSED
@@ -360,6 +366,8 @@ model HouseholdItem {
   memo          String?
   minStock      Int?
   cycleDays     Int?
+  lastPurchasedAt DateTime?
+  nextEstimatedRunOutAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?
@@ -393,6 +401,7 @@ model ProductLink {
   deletedAt       DateTime?
 
   householdItem   HouseholdItem   @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+  purchaseLogs    ItemPurchaseLog[]
 
   @@index([householdItemId])
   @@index([url])
@@ -402,9 +411,13 @@ model ItemPurchaseRule {
   id                  String   @id @default(uuid())
   householdItemId     String   @unique
   exactOnly           Boolean  @default(false)
+  substitutionPolicy  SubstitutionPolicy @default(NOT_ALLOWED)
   priceLimit          Decimal? @db.Decimal(12, 2)
   approvalThreshold   Decimal? @db.Decimal(12, 2)
+  deliveryCondition   String?
+  reorderThreshold    Int?
   preferredMallName   String?
+  note                String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   deletedAt           DateTime?
@@ -414,20 +427,30 @@ model ItemPurchaseRule {
 
 model ItemPurchaseLog {
   id                  String   @id @default(uuid())
+  requestId           String   @unique
+  requestPayloadHash  String?
   householdItemId     String
+  productLinkId       String?
   purchasedByMemberId String?
+  quantity            Decimal? @db.Decimal(12, 2)
+  unitPrice           Decimal? @db.Decimal(12, 2)
   amount              Decimal  @db.Decimal(12, 2)
+  currency            String   @default("KRW")
   purchasedAt         DateTime @default(now())
+  stockAfterPurchase  Int?
   note                String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   deletedAt           DateTime?
 
   householdItem       HouseholdItem   @relation(fields: [householdItemId], references: [id], onDelete: Cascade)
+  productLink         ProductLink?     @relation(fields: [productLinkId], references: [id], onDelete: SetNull)
   purchasedByMember   FamilyMember?   @relation("ItemPurchasedBy", fields: [purchasedByMemberId], references: [id], onDelete: SetNull)
   itemAccountLink     ItemAccountLink?
 
+  @@index([requestId])
   @@index([householdItemId])
+  @@index([productLinkId])
   @@index([purchasedByMemberId])
 }
 
@@ -618,6 +641,7 @@ model CalendarViewSetting {
 model AccountCategory {
   id           String          @id @default(uuid())
   familyId     String
+  code         String
   name         String
   categoryType AccountEntryType @default(EXPENSE)
   sortOrder    Int             @default(0)
@@ -631,6 +655,7 @@ model AccountCategory {
   fixedExpenses FixedExpense[]
 
   @@index([familyId])
+  @@unique([familyId, code])
   @@unique([familyId, name])
 }
 
@@ -640,6 +665,7 @@ model AccountEntry {
   accountCategoryId String
   entryType        AccountEntryType
   amount           Decimal           @db.Decimal(12, 2)
+  currency         String            @default("KRW")
   title            String
   memo             String?
   spentAt          DateTime

@@ -1,10 +1,11 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { FamilyRole, Prisma } from "@prisma/client";
 
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateHouseholdItemDto } from "./dto/create-household-item.dto";
 import { UpdateHouseholdItemDto } from "./dto/update-household-item.dto";
+import { UpsertPurchaseRuleDto } from "./dto/upsert-purchase-rule.dto";
 
 const householdItemInclude = {
   productLinks: {
@@ -127,6 +128,56 @@ export class HouseholdItemsService {
     };
   }
 
+  async getPurchaseRule(user: CurrentUserPayload, itemId: string) {
+    const item = await this.findAccessibleItem(user.userId, itemId);
+
+    return {
+      purchaseRule: item.purchaseRule ? this.serializePurchaseRule(item.purchaseRule) : null,
+    };
+  }
+
+  async upsertPurchaseRule(user: CurrentUserPayload, itemId: string, dto: UpsertPurchaseRuleDto) {
+    const item = await this.findAccessibleItem(user.userId, itemId);
+    const membership = await this.ensureFamilyMember(user.userId, item.familyId);
+
+    if (membership.role !== FamilyRole.OWNER && membership.role !== FamilyRole.ADMIN) {
+      throw new ForbiddenException("가족 관리자만 구매 규칙을 바꿀 수 있어요.");
+    }
+
+    const purchaseRule = await this.prisma.itemPurchaseRule.upsert({
+      where: {
+        householdItemId: item.id,
+      },
+      update: {
+        ...(dto.exactOnly !== undefined ? { exactOnly: dto.exactOnly } : {}),
+        ...(dto.substitutionPolicy !== undefined ? { substitutionPolicy: dto.substitutionPolicy } : {}),
+        ...(dto.priceLimit !== undefined ? { priceLimit: new Prisma.Decimal(dto.priceLimit) } : {}),
+        ...(dto.approvalRequiredAbove !== undefined
+          ? { approvalThreshold: new Prisma.Decimal(dto.approvalRequiredAbove) }
+          : {}),
+        ...(dto.deliveryCondition !== undefined ? { deliveryCondition: this.trimOptional(dto.deliveryCondition) } : {}),
+        ...(dto.reorderThreshold !== undefined ? { reorderThreshold: dto.reorderThreshold } : {}),
+        ...(dto.note !== undefined ? { note: this.trimOptional(dto.note) } : {}),
+        deletedAt: null,
+      },
+      create: {
+        householdItemId: item.id,
+        exactOnly: dto.exactOnly ?? false,
+        substitutionPolicy: dto.substitutionPolicy ?? "NOT_ALLOWED",
+        priceLimit: dto.priceLimit === undefined ? undefined : new Prisma.Decimal(dto.priceLimit),
+        approvalThreshold:
+          dto.approvalRequiredAbove === undefined ? undefined : new Prisma.Decimal(dto.approvalRequiredAbove),
+        deliveryCondition: this.trimOptional(dto.deliveryCondition),
+        reorderThreshold: dto.reorderThreshold,
+        note: this.trimOptional(dto.note),
+      },
+    });
+
+    return {
+      purchaseRule: this.serializePurchaseRule(purchaseRule),
+    };
+  }
+
   async findAccessibleItem(userId: string, itemId: string) {
     const item = await this.prisma.householdItem.findFirst({
       where: {
@@ -174,6 +225,8 @@ export class HouseholdItemsService {
       unit: item.unit,
       minStock: item.minStock,
       cycleDays: item.cycleDays,
+      lastPurchasedAt: item.lastPurchasedAt,
+      nextEstimatedRunOutAt: item.nextEstimatedRunOutAt,
       memo: item.memo,
       createdByUserId: item.createdByUserId,
       createdAt: item.createdAt,
@@ -193,16 +246,31 @@ export class HouseholdItemsService {
         createdAt: link.createdAt,
         updatedAt: link.updatedAt,
       })),
-      purchaseRule: item.purchaseRule
-        ? {
-            id: item.purchaseRule.id,
-            exactOnly: item.purchaseRule.exactOnly,
-            priceLimit: item.purchaseRule.priceLimit === null ? null : Number(item.purchaseRule.priceLimit),
-            approvalThreshold:
-              item.purchaseRule.approvalThreshold === null ? null : Number(item.purchaseRule.approvalThreshold),
-            preferredMallName: item.purchaseRule.preferredMallName,
-          }
-        : null,
+      purchaseRule: item.purchaseRule ? this.serializePurchaseRule(item.purchaseRule) : null,
+    };
+  }
+
+  serializePurchaseRule(rule: {
+    id: string;
+    exactOnly: boolean;
+    substitutionPolicy: string;
+    priceLimit: Prisma.Decimal | null;
+    approvalThreshold: Prisma.Decimal | null;
+    deliveryCondition: string | null;
+    reorderThreshold: number | null;
+    preferredMallName: string | null;
+    note: string | null;
+  }) {
+    return {
+      id: rule.id,
+      exactOnly: rule.exactOnly,
+      substitutionPolicy: rule.substitutionPolicy,
+      priceLimit: rule.priceLimit === null ? null : Number(rule.priceLimit),
+      deliveryCondition: rule.deliveryCondition,
+      reorderThreshold: rule.reorderThreshold,
+      approvalRequiredAbove: rule.approvalThreshold === null ? null : Number(rule.approvalThreshold),
+      preferredMallName: rule.preferredMallName,
+      note: rule.note,
     };
   }
 
