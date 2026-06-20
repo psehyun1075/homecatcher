@@ -1,4 +1,5 @@
 import { Text } from "react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { AppButton } from "../components/app-button";
 import { AppCard } from "../components/app-card";
@@ -8,9 +9,12 @@ import { LoadingState } from "../components/loading-state";
 import { Screen } from "../components/screen";
 import { useAuth } from "../auth/auth-context";
 import { useFamily } from "../family/family-context";
+import type { MyHomeStackParamList } from "../navigation/types";
 import { screenStyles } from "./styles";
 
-export function MyHomeScreen() {
+type Props = NativeStackScreenProps<MyHomeStackParamList, "MyHomeMain">;
+
+export function MyHomeScreen({ navigation }: Props) {
   const { signOut, sessionStorageWarning, clearSessionStorageWarning } = useAuth();
   const {
     families,
@@ -60,8 +64,9 @@ export function MyHomeScreen() {
       </AppCard>
 
       <AppCard>
-        <Text style={screenStyles.cardTitle}>템플릿 빠른 시작</Text>
-        <Text style={screenStyles.cardText}>나중에 다시 템플릿을 적용하는 진입점은 다음 단계에서 연결할게요.</Text>
+        <Text style={screenStyles.cardTitle}>우리집 매뉴얼</Text>
+        <Text style={screenStyles.cardText}>매번 설명하지 않아도 함께 볼 수 있어요.</Text>
+        <AppButton title="우리집 매뉴얼 보기" onPress={() => navigation.navigate("HomeManualList")} variant="secondary" />
       </AppCard>
 
       <AppButton title="로그아웃" onPress={() => void signOut()} variant="ghost" />

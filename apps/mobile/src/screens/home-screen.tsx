@@ -128,9 +128,10 @@ export function HomeScreen() {
 
       <AppCard>
         <Text style={screenStyles.cardTitle}>빠른 행동</Text>
-        <AppButton title="생필품 보기" onPress={() => navigation.navigate("HouseholdItems")} variant="secondary" />
-        <AppButton title="할 일 보기" onPress={() => navigation.navigate("Todos")} variant="secondary" />
+        <AppButton title="생필품 보기" onPress={() => navigation.navigate("HouseholdItems", { screen: "HouseholdItemList" })} variant="secondary" />
+        <AppButton title="할 일 보기" onPress={() => navigation.navigate("Todos", { screen: "TodoList" })} variant="secondary" />
         <AppButton title="가족 캘린더 보기" onPress={() => navigation.navigate("Calendar")} variant="secondary" />
+        <AppButton title="우리집 매뉴얼 보기" onPress={() => navigation.navigate("MyHome", { screen: "HomeManualList" })} variant="secondary" />
       </AppCard>
     </Screen>
   );
