@@ -3,6 +3,7 @@ import { AccountEntryType, FamilyRole, Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 
 import { AccountbookService } from "../accountbook/accountbook.service";
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { HouseholdItemsService } from "../household-items/household-items.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -31,6 +32,7 @@ export class PurchasesService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(HouseholdItemsService) private readonly householdItemsService: HouseholdItemsService,
     @Inject(AccountbookService) private readonly accountbookService: AccountbookService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
   ) {}
 
   async createPurchase(user: CurrentUserPayload, itemId: string, dto: CreateItemPurchaseDto) {
@@ -123,6 +125,13 @@ export class PurchasesService {
             lastPurchasedAt: purchasedAt,
             nextEstimatedRunOutAt,
           },
+        });
+
+        await this.activityWriter.recordHouseholdItemPurchased(tx, {
+          purchaseId: createdPurchase.id,
+          householdItemId: item.id,
+          actorMemberId: membership.id,
+          occurredAt: purchasedAt,
         });
 
         return tx.itemPurchaseLog.findUniqueOrThrow({

@@ -1,0 +1,41 @@
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'ACTIVITY';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'TODO_DUE';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'FIXED_EXPENSE_DUE';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'FAMILY_EVENT_START';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'HOUSEHOLD_ITEM_RUNOUT';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'APPRECIATION_RECEIVED';
+
+ALTER TYPE "NotificationStatus" ADD VALUE IF NOT EXISTS 'CANCELLED';
+
+ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'TODO_COMPLETED';
+ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'HOUSEHOLD_ITEM_PURCHASED';
+ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'HOME_MANUAL_CREATED';
+ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'FAMILY_EVENT_CREATED';
+ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'TEMPLATE_APPLIED';
+
+ALTER TABLE "Notification"
+  ADD COLUMN IF NOT EXISTS "sourceType" TEXT,
+  ADD COLUMN IF NOT EXISTS "sourceId" TEXT,
+  ADD COLUMN IF NOT EXISTS "deepLink" TEXT,
+  ADD COLUMN IF NOT EXISTS "dedupeKey" TEXT,
+  ADD COLUMN IF NOT EXISTS "availableAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "payload" JSONB;
+
+ALTER TABLE "ActivityLog"
+  ADD COLUMN IF NOT EXISTS "sourceType" TEXT,
+  ADD COLUMN IF NOT EXISTS "sourceId" TEXT,
+  ADD COLUMN IF NOT EXISTS "deepLink" TEXT,
+  ADD COLUMN IF NOT EXISTS "dedupeKey" TEXT,
+  ADD COLUMN IF NOT EXISTS "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Notification_dedupeKey_key" ON "Notification"("dedupeKey");
+CREATE INDEX IF NOT EXISTS "Notification_availableAt_idx" ON "Notification"("availableAt");
+CREATE INDEX IF NOT EXISTS "Notification_archivedAt_idx" ON "Notification"("archivedAt");
+CREATE INDEX IF NOT EXISTS "Notification_sourceType_sourceId_idx" ON "Notification"("sourceType", "sourceId");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "ActivityLog_dedupeKey_key" ON "ActivityLog"("dedupeKey");
+CREATE INDEX IF NOT EXISTS "ActivityLog_sourceType_sourceId_idx" ON "ActivityLog"("sourceType", "sourceId");
+CREATE INDEX IF NOT EXISTS "ActivityLog_occurredAt_idx" ON "ActivityLog"("occurredAt");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Appreciation_activityId_fromMemberId_key" ON "Appreciation"("activityId", "fromMemberId");

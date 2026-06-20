@@ -658,6 +658,77 @@ curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/calendar/month?month=2
 API_BASE_URL="http://127.0.0.1:3003/api/v1" apps/api/scripts/smoke/t008-calendar-fixed-expenses.sh
 ```
 
+## T-009 가족 피드, 고마워요, 인앱 알림
+
+주요 완료·생성 활동은 원본 작업 transaction 안에서 가족 피드에 자동 기록됩니다. 피드 payload에는 표시용 snapshot만 저장하며 이메일, 토큰, 비밀번호, 가계부 상세 금액은 넣지 않습니다.
+
+```bash
+curl "http://localhost:3000/api/v1/families/$FAMILY_ID/feed?limit=20" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/activities/$ACTIVITY_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+고마워요는 활동의 actor에게만 전달됩니다. 클라이언트가 수신자를 직접 지정하지 않으며, 자기 활동이나 시스템 활동에는 남길 수 없습니다. 같은 활동에 같은 구성원이 다시 남기면 기존 고마워요를 반환합니다. 삭제된 고마워요를 다시 남기면 같은 unique key 기준으로 재활성화합니다. 고마워요를 삭제해도 이미 생성된 수신 알림은 감사 이력 보존을 위해 유지합니다.
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/activities/$ACTIVITY_ID/appreciations" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"챙겨줘서 고마워요!"}'
+
+curl "http://localhost:3000/api/v1/activities/$ACTIVITY_ID/appreciations" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X DELETE "http://localhost:3000/api/v1/appreciations/$APPRECIATION_ID" \
+  -H "Authorization: Bearer $MEMBER_ACCESS_TOKEN"
+```
+
+알림함은 현재 로그인 사용자에게 발행되고 `availableAt`이 지난 알림만 일반 목록에 표시합니다. 다른 사용자의 알림 ID에는 접근할 수 없습니다.
+
+```bash
+curl "http://localhost:3000/api/v1/notifications?unreadOnly=true&limit=20" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl "http://localhost:3000/api/v1/notifications/unread-count?familyId=$FAMILY_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X PATCH "http://localhost:3000/api/v1/notifications/$NOTIFICATION_ID/read" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+curl -X POST "http://localhost:3000/api/v1/notifications/read-all" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"familyId\":\"$FAMILY_ID\"}"
+
+curl -X PATCH "http://localhost:3000/api/v1/notifications/$NOTIFICATION_ID/archive" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+예약 알림 sync는 실제 FCM/APNs push를 보내지 않고 Notification 예약 레코드만 upsert합니다. 같은 sync를 두 번 실행해도 `dedupeKey`로 중복 생성되지 않으며, source 변경·삭제로 더 이상 유효하지 않은 미래 예약은 `CANCELLED` 처리됩니다.
+
+```bash
+pnpm --filter @home-catcher/api notifications:sync -- --now=2026-07-22T00:00:00Z
+pnpm --filter @home-catcher/api notifications:sync -- --now=2026-07-22T00:00:00Z
+```
+
+외부인은 가족 피드와 고마워요에 접근할 수 없습니다.
+
+```bash
+curl -i "http://localhost:3000/api/v1/families/$FAMILY_ID/feed" \
+  -H "Authorization: Bearer $OUTSIDER_ACCESS_TOKEN"
+
+curl -i "http://localhost:3000/api/v1/notifications/$OTHER_USER_NOTIFICATION_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+반복 가능한 smoke test는 API 서버를 3004 포트로 실행한 뒤 아래처럼 실행합니다.
+
+```bash
+API_BASE_URL="http://127.0.0.1:3004/api/v1" bash apps/api/scripts/smoke/t009-feed-appreciation-notifications.sh
+```
+
 ## 테스트용 실행 순서
 ```bash
 pnpm install

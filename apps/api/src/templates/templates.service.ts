@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { FamilyRole, Prisma, TemplateItemType, TodoScheduleType } from "@prisma/client";
 
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -43,7 +44,10 @@ const APPLICABLE_ITEM_TYPES = [TemplateItemType.HOUSEHOLD_ITEM, TemplateItemType
 
 @Injectable()
 export class TemplatesService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
+  ) {}
 
   async listTemplates() {
     const templates = await this.prisma.templateSet.findMany({
@@ -258,6 +262,14 @@ export class TemplatesService {
           templateSetId,
           appliedByUserId: user.userId,
         },
+      });
+
+      await this.activityWriter.recordTemplateApplied(tx, {
+        applicationId: application.id,
+        familyId,
+        templateName: template.name,
+        actorMemberId: membership.id,
+        occurredAt: application.appliedAt,
       });
 
       return {

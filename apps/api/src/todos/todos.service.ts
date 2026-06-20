@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Inject, Inj
 import { FamilyRole, Prisma, TodoScheduleType } from "@prisma/client";
 import { createHash } from "crypto";
 
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import {
   addLocalDays,
@@ -60,7 +61,10 @@ type SchedulePayload = {
 
 @Injectable()
 export class TodosService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
+  ) {}
 
   async listTodos(user: CurrentUserPayload, familyId: string, query: ListTodosQueryDto) {
     await this.ensureFamilyMember(user.userId, familyId);
@@ -345,6 +349,13 @@ export class TodosService {
           data: {
             completedAt: shouldMarkCompleted ? completedAt : null,
           },
+        });
+
+        await this.activityWriter.recordTodoCompleted(tx, {
+          completionId: created.id,
+          todoId: todo.id,
+          actorMemberId: membership.id,
+          occurredAt: completedAt,
         });
 
         return tx.todoCompletion.findUniqueOrThrow({

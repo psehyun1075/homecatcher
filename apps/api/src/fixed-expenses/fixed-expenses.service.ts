@@ -3,6 +3,7 @@ import { AccountEntryType, FamilyRole, FixedExpenseStatus, Prisma, RecurrenceTyp
 import { createHash } from "crypto";
 
 import { AccountbookService } from "../accountbook/accountbook.service";
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import {
   addLocalDays,
@@ -54,6 +55,7 @@ export class FixedExpensesService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AccountbookService) private readonly accountbookService: AccountbookService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
   ) {}
 
   async listFixedExpenses(user: CurrentUserPayload, familyId: string, query: ListFixedExpensesQueryDto) {
@@ -333,6 +335,13 @@ export class FixedExpensesService {
             accountEntryId: accountEntry.id,
             note: this.trimOptional(dto.note),
           },
+        });
+
+        await this.activityWriter.recordFixedExpensePaid(tx, {
+          paymentId: created.id,
+          fixedExpenseId: fixedExpense.id,
+          actorMemberId: membership.id,
+          occurredAt: paidAt,
         });
 
         return tx.fixedExpensePayment.findUniqueOrThrow({
