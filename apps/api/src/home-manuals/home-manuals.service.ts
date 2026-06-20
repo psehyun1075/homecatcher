@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { FamilyRole, Prisma } from "@prisma/client";
 
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateHomeManualDto } from "./dto/create-home-manual.dto";
@@ -41,7 +42,10 @@ type ManualWithRelations = Prisma.HomeManualGetPayload<{ include: typeof manualI
 
 @Injectable()
 export class HomeManualsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
+  ) {}
 
   async listManuals(user: CurrentUserPayload, familyId: string, query: ListHomeManualsQueryDto) {
     await this.ensureFamilyMember(user.userId, familyId);
@@ -109,6 +113,12 @@ export class HomeManualsService {
           },
         });
       }
+
+      await this.activityWriter.recordHomeManualCreated(tx, {
+        manualId: created.id,
+        actorMemberId: membership.id,
+        occurredAt: created.createdAt,
+      });
 
       return tx.homeManual.findUniqueOrThrow({
         where: {

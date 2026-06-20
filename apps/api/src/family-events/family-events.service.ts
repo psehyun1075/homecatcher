@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { FamilyRole, Prisma, RecurrenceType } from "@prisma/client";
 
+import { ActivityWriterService } from "../activity-feed/activity-writer.service";
 import { CurrentUserPayload } from "../auth/decorators/current-user.decorator";
 import { assertValidDateKey, assertValidTimezone } from "../common/calendar-date.util";
 import { PrismaService } from "../prisma/prisma.service";
@@ -27,7 +28,10 @@ export type FamilyEventWithRelations = Prisma.FamilyEventGetPayload<{ include: t
 
 @Injectable()
 export class FamilyEventsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ActivityWriterService) private readonly activityWriter: ActivityWriterService,
+  ) {}
 
   async listEvents(user: CurrentUserPayload, familyId: string, query: ListFamilyEventsQueryDto) {
     await this.ensureFamilyMember(user.userId, familyId);
@@ -112,30 +116,37 @@ export class FamilyEventsService {
     this.ensureAllowedRecurrenceType(dto.recurrenceType ?? RecurrenceType.ONCE);
     this.ensureValidRecurrenceRule(dto.recurrenceRule);
 
-    const created = await this.prisma.familyEvent.create({
-      data: {
-        familyId,
-        createdByMemberId: membership.id,
-        title: dto.title.trim(),
-        description: this.trimOptional(dto.description),
-        eventType: dto.eventType,
-        location: this.trimOptional(dto.location),
-        startAt,
-        endAt,
-        allDay: dto.allDay ?? false,
-        timezone,
-        displayColor: dto.displayColor ?? null,
-        recurrenceType: dto.recurrenceType ?? RecurrenceType.ONCE,
-        recurrenceRule: this.toJson(dto.recurrenceRule),
-        participants: {
-          create: participantMemberIds.map((memberId, index) => ({
-            familyMemberId: memberId,
-            isPrimary: index === 0,
-          })),
+    const event = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.familyEvent.create({
+        data: {
+          familyId,
+          createdByMemberId: membership.id,
+          title: dto.title.trim(),
+          description: this.trimOptional(dto.description),
+          eventType: dto.eventType,
+          location: this.trimOptional(dto.location),
+          startAt,
+          endAt,
+          allDay: dto.allDay ?? false,
+          timezone,
+          displayColor: dto.displayColor ?? null,
+          recurrenceType: dto.recurrenceType ?? RecurrenceType.ONCE,
+          recurrenceRule: this.toJson(dto.recurrenceRule),
+          participants: {
+            create: participantMemberIds.map((memberId, index) => ({
+              familyMemberId: memberId,
+              isPrimary: index === 0,
+            })),
+          },
         },
-      },
+      });
+      await this.activityWriter.recordFamilyEventCreated(tx, {
+        eventId: created.id,
+        actorMemberId: membership.id,
+        occurredAt: created.createdAt,
+      });
+      return tx.familyEvent.findUniqueOrThrow({ where: { id: created.id }, include: familyEventInclude });
     });
-    const event = await this.findEvent(created.id);
 
     return {
       event: this.serializeEvent(event),

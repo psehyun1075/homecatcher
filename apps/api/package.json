@@ -12,6 +12,7 @@
     "prisma:seed": "node scripts/prisma-run.cjs seed",
     "prisma:studio": "node scripts/prisma-run.cjs studio --schema prisma/schema.prisma",
     "prisma:reset": "node scripts/prisma-run.cjs migrate reset --force --skip-seed --schema prisma/schema.prisma",
+    "notifications:sync": "tsx scripts/notification-sync.ts",
     "postinstall": "node scripts/prisma-run.cjs generate --schema prisma/schema.prisma"
   },
   "dependencies": {

@@ -1,13 +1,14 @@
 import { Module } from "@nestjs/common";
 
 import { AccountbookModule } from "../accountbook/accountbook.module";
+import { ActivityFeedModule } from "../activity-feed/activity-feed.module";
 import { HouseholdItemsModule } from "../household-items/household-items.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { PurchasesController } from "./purchases.controller";
 import { PurchasesService } from "./purchases.service";
 
 @Module({
-  imports: [PrismaModule, HouseholdItemsModule, AccountbookModule],
+  imports: [PrismaModule, HouseholdItemsModule, AccountbookModule, ActivityFeedModule],
   controllers: [PurchasesController],
   providers: [PurchasesService],
 })

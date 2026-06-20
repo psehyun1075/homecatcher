@@ -123,6 +123,12 @@ enum NotificationType {
   EXPENSE
   FEED
   APPRECIATION
+  ACTIVITY
+  TODO_DUE
+  FIXED_EXPENSE_DUE
+  FAMILY_EVENT_START
+  HOUSEHOLD_ITEM_RUNOUT
+  APPRECIATION_RECEIVED
   SYSTEM
 }
 
@@ -132,14 +138,20 @@ enum NotificationStatus {
   READ
   FAILED
   CANCELED
+  CANCELLED
 }
 
 enum ActivityType {
   ITEM_PURCHASE
   TODO_COMPLETE
+  TODO_COMPLETED
+  HOUSEHOLD_ITEM_PURCHASED
   FIXED_EXPENSE_PAID
   MANUAL_CREATED
+  HOME_MANUAL_CREATED
   EVENT_CREATED
+  FAMILY_EVENT_CREATED
+  TEMPLATE_APPLIED
   APPRECIATION_SENT
   MEMBER_JOINED
 }
@@ -855,9 +867,16 @@ model Notification {
   status          NotificationStatus @default(PENDING)
   title           String
   message         String
+  sourceType      String?
+  sourceId        String?
+  deepLink        String?
+  dedupeKey       String             @unique
+  availableAt     DateTime           @default(now())
   scheduledAt     DateTime?
   sentAt          DateTime?
   readAt          DateTime?
+  archivedAt      DateTime?
+  payload         Json?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
@@ -868,6 +887,9 @@ model Notification {
   @@index([userId])
   @@index([familyId])
   @@index([status])
+  @@index([availableAt])
+  @@index([archivedAt])
+  @@index([sourceType, sourceId])
 }
 
 model ActivityLog {
@@ -877,9 +899,14 @@ model ActivityLog {
   activityType  ActivityType
   entityType    String
   entityId      String
+  sourceType    String?
+  sourceId      String?
+  deepLink      String?
+  dedupeKey     String        @unique
   title         String
   message       String?
   payload       Json?
+  occurredAt    DateTime      @default(now())
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
@@ -891,6 +918,8 @@ model ActivityLog {
   @@index([familyId])
   @@index([actorMemberId])
   @@index([entityType, entityId])
+  @@index([sourceType, sourceId])
+  @@index([occurredAt])
 }
 
 model Appreciation {
@@ -911,4 +940,5 @@ model Appreciation {
   @@index([activityId])
   @@index([fromMemberId])
   @@index([toMemberId])
+  @@unique([activityId, fromMemberId])
 }
