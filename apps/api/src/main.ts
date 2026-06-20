@@ -6,6 +6,25 @@ import { NestFactory } from "@nestjs/core";
 
 import { AppModule } from "./app.module";
 
+function getAllowedCorsOrigins() {
+  const configuredOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (process.env.NODE_ENV !== "production") {
+    return [
+      ...configuredOrigins,
+      "http://localhost:19006",
+      "http://127.0.0.1:19006",
+      "http://localhost:8081",
+      "http://127.0.0.1:8081",
+    ];
+  }
+
+  return configuredOrigins;
+}
+
 function extractValidationMessage(errors: Array<{ constraints?: Record<string, string>; children?: unknown[] }>): string {
   for (const error of errors) {
     if (error.constraints) {
@@ -42,6 +61,19 @@ async function bootstrap() {
     }),
   );
   app.setGlobalPrefix("api/v1");
+  const allowedCorsOrigins = getAllowedCorsOrigins();
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedCorsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("CORS origin is not allowed"), false);
+    },
+    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+  });
   app.enableShutdownHooks();
 
   const host = process.env.API_HOST ?? "0.0.0.0";

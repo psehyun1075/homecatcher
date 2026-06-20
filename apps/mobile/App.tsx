@@ -1,56 +1,43 @@
-import { SafeAreaView, StatusBar, StyleSheet, Text, View } from "react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StatusBar } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { enableScreens } from "react-native-screens";
+
+import { AuthProvider, useAuth } from "./src/auth/auth-context";
+import { FamilyProvider } from "./src/family/family-context";
+import { RootNavigator } from "./src/navigation/root-navigator";
+import { colors } from "./src/theme/colors";
+
+enableScreens();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F6F1E8" />
-      <View style={styles.container}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>HomeCatcher MVP</Text>
-        </View>
-        <Text style={styles.title}>홈캐처</Text>
-        <Text style={styles.subtitle}>우리집 일을 놓치지 않게</Text>
-      </View>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F6F1E8",
-  },
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    backgroundColor: "#F6F1E8",
-  },
-  badge: {
-    marginBottom: 16,
-    borderRadius: 999,
-    backgroundColor: "#1F4E5F",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-  },
-  title: {
-    color: "#17313C",
-    fontSize: 36,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    marginBottom: 10,
-  },
-  subtitle: {
-    color: "#4D5F66",
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-});
+function AppContent() {
+  const { user } = useAuth();
+
+  return (
+    <FamilyProvider key={user?.id ?? "guest"} enabled={Boolean(user)}>
+      <RootNavigator />
+    </FamilyProvider>
+  );
+}
