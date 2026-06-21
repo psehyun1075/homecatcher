@@ -44,59 +44,62 @@ export class NotificationSyncService {
     ];
     const desiredKeys = planned.map((notification) => notification.dedupeKey);
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const notification of planned) {
-        await tx.notification.upsert({
-          where: { dedupeKey: notification.dedupeKey },
-          update: {
-            title: notification.title,
-            message: notification.message,
-            availableAt: notification.availableAt,
-            scheduledAt: notification.availableAt,
-            status: NotificationStatus.PENDING,
-            archivedAt: null,
-            deletedAt: null,
-            payload: notification.payload ?? Prisma.JsonNull,
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const notification of planned) {
+          await tx.notification.upsert({
+            where: { dedupeKey: notification.dedupeKey },
+            update: {
+              title: notification.title,
+              message: notification.message,
+              availableAt: notification.availableAt,
+              scheduledAt: notification.availableAt,
+              status: NotificationStatus.PENDING,
+              archivedAt: null,
+              deletedAt: null,
+              payload: notification.payload ?? Prisma.JsonNull,
+            },
+            create: {
+              userId: notification.userId,
+              familyId: notification.familyId,
+              notificationType: notification.notificationType,
+              title: notification.title,
+              message: notification.message,
+              sourceType: notification.sourceType,
+              sourceId: notification.sourceId,
+              deepLink: notification.deepLink,
+              dedupeKey: notification.dedupeKey,
+              availableAt: notification.availableAt,
+              scheduledAt: notification.availableAt,
+              payload: notification.payload ?? Prisma.JsonNull,
+            },
+          });
+        }
+
+        const where: Prisma.NotificationWhereInput = {
+          notificationType: {
+            in: [
+              NotificationType.TODO_DUE,
+              NotificationType.FIXED_EXPENSE_DUE,
+              NotificationType.FAMILY_EVENT_START,
+              NotificationType.HOUSEHOLD_ITEM_RUNOUT,
+            ],
           },
-          create: {
-            userId: notification.userId,
-            familyId: notification.familyId,
-            notificationType: notification.notificationType,
-            title: notification.title,
-            message: notification.message,
-            sourceType: notification.sourceType,
-            sourceId: notification.sourceId,
-            deepLink: notification.deepLink,
-            dedupeKey: notification.dedupeKey,
-            availableAt: notification.availableAt,
-            scheduledAt: notification.availableAt,
-            payload: notification.payload ?? Prisma.JsonNull,
-          },
+          availableAt: { gt: now, lt: horizonEnd },
+          status: NotificationStatus.PENDING,
+          readAt: null,
+          archivedAt: null,
+          ...(desiredKeys.length > 0 ? { dedupeKey: { notIn: desiredKeys } } : {}),
+        };
+        const cancelled = await tx.notification.updateMany({
+          where,
+          data: { status: NotificationStatus.CANCELLED },
         });
-      }
 
-      const where: Prisma.NotificationWhereInput = {
-        notificationType: {
-          in: [
-            NotificationType.TODO_DUE,
-            NotificationType.FIXED_EXPENSE_DUE,
-            NotificationType.FAMILY_EVENT_START,
-            NotificationType.HOUSEHOLD_ITEM_RUNOUT,
-          ],
-        },
-        availableAt: { gt: now, lt: horizonEnd },
-        status: NotificationStatus.PENDING,
-        readAt: null,
-        archivedAt: null,
-        ...(desiredKeys.length > 0 ? { dedupeKey: { notIn: desiredKeys } } : {}),
-      };
-      const cancelled = await tx.notification.updateMany({
-        where,
-        data: { status: NotificationStatus.CANCELLED },
-      });
-
-      return cancelled;
-    });
+        return cancelled;
+      },
+      { timeout: 60_000 },
+    );
 
     return { plannedCount: planned.length, dedupeKeys: desiredKeys };
   }

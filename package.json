@@ -8,7 +8,10 @@
     "dev:mobile": "pnpm --filter @home-catcher/mobile start",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "verify": "pnpm lint && pnpm typecheck && pnpm build && pnpm --filter @home-catcher/mobile exec expo export --platform web",
+    "test:api-smoke": "bash apps/api/scripts/smoke/mvp-full-regression.sh",
+    "test:mvp": "bash apps/api/scripts/smoke/mvp-full-regression.sh"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -6,6 +6,19 @@ import { NestFactory } from "@nestjs/core";
 
 import { AppModule } from "./app.module";
 
+function validateEnvironment() {
+  const requiredVariables = ["DATABASE_URL", "REDIS_URL", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+  const missing = requiredVariables.filter((name) => !process.env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(`필수 환경변수가 없어요: ${missing.join(", ")}`);
+  }
+
+  if (process.env.NODE_ENV === "production" && (process.env.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim()).includes("*")) {
+    throw new Error("production에서는 CORS_ORIGINS에 *를 사용할 수 없어요.");
+  }
+}
+
 function getAllowedCorsOrigins() {
   const configuredOrigins = (process.env.CORS_ORIGINS ?? "")
     .split(",")
@@ -41,6 +54,8 @@ function extractValidationMessage(errors: Array<{ constraints?: Record<string, s
 
 async function bootstrap() {
   loadEnv({ path: "../../.env" });
+  loadEnv({ path: ".env", override: false });
+  validateEnvironment();
 
   const app = await NestFactory.create(AppModule, {
     logger: ["log", "error", "warn"],

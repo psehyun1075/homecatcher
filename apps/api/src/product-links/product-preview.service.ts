@@ -5,7 +5,7 @@ import { lookup } from "node:dns/promises";
 import { isBlockedHostname, isBlockedIpAddress } from "./utils/ip-address";
 
 const USER_AGENT = "HomeCatcherProductPreview/0.1.0";
-const REQUEST_TIMEOUT_MS = 5000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const MAX_REDIRECTS = 3;
 const MAX_BODY_BYTES = 512 * 1024;
 
@@ -74,7 +74,7 @@ export class ProductPreviewService {
       await this.assertPublicHttpUrl(currentUrl);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs());
 
       try {
         const response = await fetch(currentUrl, {
@@ -154,6 +154,14 @@ export class ProductPreviewService {
     }
 
     return Buffer.concat(chunks).toString("utf8");
+  }
+
+  private requestTimeoutMs() {
+    const parsed = Number(process.env.PRODUCT_PREVIEW_TIMEOUT_MS ?? DEFAULT_REQUEST_TIMEOUT_MS);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return DEFAULT_REQUEST_TIMEOUT_MS;
+    }
+    return Math.min(Math.trunc(parsed), 30_000);
   }
 
   private normalizeUrl(url: string) {

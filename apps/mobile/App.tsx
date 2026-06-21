@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableScreens } from "react-native-screens";
 
 import { AuthProvider, useAuth } from "./src/auth/auth-context";
+import { ErrorBoundary } from "./src/components/error-boundary";
 import { FamilyProvider } from "./src/family/family-context";
 import { RootNavigator } from "./src/navigation/root-navigator";
 import { colors } from "./src/theme/colors";
@@ -24,9 +25,11 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ErrorBoundary>
       </QueryClientProvider>
     </SafeAreaProvider>
   );
