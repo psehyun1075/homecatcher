@@ -69,6 +69,18 @@ export function MyHomeScreen({ navigation }: Props) {
         <AppButton title="우리집 매뉴얼 보기" onPress={() => navigation.navigate("HomeManualList")} variant="secondary" />
       </AppCard>
 
+      <AppCard>
+        <Text style={screenStyles.cardTitle}>고정지출 알림</Text>
+        <Text style={screenStyles.cardText}>월세, 관리비처럼 돈 나가는 날을 함께 챙겨요.</Text>
+        <AppButton title="고정지출 보기" onPress={() => navigation.navigate("FixedExpenseList")} variant="secondary" />
+      </AppCard>
+
+      <AppCard>
+        <Text style={screenStyles.cardTitle}>가계부</Text>
+        <Text style={screenStyles.cardText}>우리집 생활비를 카테고리별로 확인해요.</Text>
+        <AppButton title="가계부 보기" onPress={() => navigation.navigate("AccountbookHome")} variant="secondary" />
+      </AppCard>
+
       <AppButton title="로그아웃" onPress={() => void signOut()} variant="ghost" />
     </Screen>
   );

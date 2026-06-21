@@ -27,6 +27,7 @@ const accountEntryInclude = {
       itemPurchaseLog: true,
     },
   },
+  fixedExpensePayment: true,
 } satisfies Prisma.AccountEntryInclude;
 
 type PrismaWriteClient = PrismaService | Prisma.TransactionClient;
@@ -82,8 +83,8 @@ export class AccountbookService {
     await this.ensureFamilyMember(user.userId, familyId);
     await this.ensureDefaultCategories(familyId);
 
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const page = this.normalizePage(query.page);
+    const limit = this.normalizeLimit(query.limit);
     const where: Prisma.AccountEntryWhereInput = {
       familyId,
       deletedAt: null,
@@ -192,7 +193,7 @@ export class AccountbookService {
     for (const entry of entries) {
       const amount = Number(entry.amount);
       totalExpense += amount;
-      const key = entry.accountCategory.code;
+      const key = entry.accountCategory?.code ?? "OTHER";
       const existing = grouped.get(key);
 
       if (existing) {
@@ -200,8 +201,8 @@ export class AccountbookService {
         existing.entryCount += 1;
       } else {
         grouped.set(key, {
-          categoryCode: entry.accountCategory.code,
-          categoryName: entry.accountCategory.name,
+          categoryCode: entry.accountCategory?.code ?? "OTHER",
+          categoryName: entry.accountCategory?.name ?? "기타",
           amount,
           entryCount: 1,
         });
@@ -283,12 +284,14 @@ export class AccountbookService {
   }
 
   serializeEntry(entry: AccountEntryWithCategory) {
+    const accountCategory = entry.accountCategory;
+
     return {
       id: entry.id,
       familyId: entry.familyId,
       categoryId: entry.accountCategoryId,
-      categoryCode: entry.accountCategory.code,
-      categoryName: entry.accountCategory.name,
+      categoryCode: accountCategory?.code ?? "OTHER",
+      categoryName: accountCategory?.name ?? "기타",
       entryType: entry.entryType,
       amount: Number(entry.amount),
       currency: entry.currency,
@@ -297,10 +300,22 @@ export class AccountbookService {
       memo: entry.memo,
       createdByMemberId: entry.createdByMemberId,
       itemPurchaseLogId: entry.itemAccountLink?.itemPurchaseLogId ?? null,
+      fixedExpensePaymentId: entry.fixedExpensePayment?.id ?? null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
       deletedAt: entry.deletedAt,
     };
+  }
+
+  private normalizePage(page: number | string | undefined) {
+    const value = Number(page ?? 1);
+    return Number.isFinite(value) && value >= 1 ? Math.trunc(value) : 1;
+  }
+
+  private normalizeLimit(limit: number | string | undefined) {
+    const value = Number(limit ?? 20);
+    if (!Number.isFinite(value)) return 20;
+    return Math.min(100, Math.max(1, Math.trunc(value)));
   }
 
   private async findEntry(entryId: string) {
