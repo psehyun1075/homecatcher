@@ -1,6 +1,8 @@
 import { Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useQuery } from "@tanstack/react-query";
 
+import { getUnreadCount } from "../api/home-api";
 import { AppButton } from "../components/app-button";
 import { AppCard } from "../components/app-card";
 import { EmptyState } from "../components/empty-state";
@@ -27,6 +29,11 @@ export function MyHomeScreen({ navigation }: Props) {
     refetchFamilies,
     selectFamily,
   } = useFamily();
+  const unreadQuery = useQuery({
+    queryKey: ["familyScope", selectedFamilyId, "notifications", "unread-count"],
+    queryFn: () => getUnreadCount(selectedFamilyId!),
+    enabled: Boolean(selectedFamilyId),
+  });
 
   return (
     <Screen>
@@ -61,6 +68,24 @@ export function MyHomeScreen({ navigation }: Props) {
             variant={family.id === selectedFamilyId ? "primary" : "secondary"}
           />
         ))}
+      </AppCard>
+
+      <AppCard>
+        <Text style={screenStyles.cardTitle}>가족 초대하기</Text>
+        <Text style={screenStyles.cardText}>초대 코드를 만들어 가족이 우리집에 함께 들어올 수 있게 해요.</Text>
+        <AppButton title="가족 초대하기" onPress={() => navigation.navigate("FamilyInvite")} variant="secondary" />
+      </AppCard>
+
+      <AppCard>
+        <Text style={screenStyles.cardTitle}>우리집 소식</Text>
+        <Text style={screenStyles.cardText}>가족이 함께 처리한 일을 따뜻하게 확인해요.</Text>
+        <AppButton title="우리집 소식 보기" onPress={() => navigation.navigate("FamilyFeed")} variant="secondary" />
+      </AppCard>
+
+      <AppCard>
+        <Text style={screenStyles.cardTitle}>알림함</Text>
+        <Text style={screenStyles.cardText}>놓치기 쉬운 우리집 일을 모아봤어요. {unreadQuery.data?.unreadCount ? `읽지 않은 알림 ${unreadQuery.data.unreadCount}개` : ""}</Text>
+        <AppButton title="알림함 보기" onPress={() => navigation.navigate("NotificationList")} variant="secondary" />
       </AppCard>
 
       <AppCard>
