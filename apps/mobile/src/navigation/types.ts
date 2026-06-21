@@ -31,13 +31,27 @@ export type MyHomeStackParamList = {
   MyHomeMain: undefined;
   HomeManualList: undefined;
   HomeManualDetail: { manualId: string };
+  AccountbookHome: undefined;
+  AccountbookEntries: { month?: string } | undefined;
+  AccountbookEntryCreate: { month?: string } | undefined;
+  FixedExpenseList: undefined;
+  FixedExpenseCreate: { initialTitle?: string; initialAmount?: string } | undefined;
+  FixedExpenseDetail: { fixedExpenseId: string; dueDate?: string; occurrenceStatus?: string; occurrenceKey?: string };
+  FixedExpensePayment: { fixedExpenseId: string; dueDate: string; occurrenceKey?: string };
+};
+
+export type CalendarStackParamList = {
+  CalendarMonth: undefined;
+  CalendarDay: { date: string };
+  FamilyEventDetail: { eventId: string };
+  FamilyEventCreate: { date?: string };
 };
 
 export type MainTabParamList = {
   Home: undefined;
   HouseholdItems: NavigatorScreenParams<HouseholdItemsStackParamList>;
   Todos: NavigatorScreenParams<TodosStackParamList>;
-  Calendar: undefined;
+  Calendar: NavigatorScreenParams<CalendarStackParamList>;
   MyHome: NavigatorScreenParams<MyHomeStackParamList>;
 };
 

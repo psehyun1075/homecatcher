@@ -14,16 +14,13 @@ import { Screen } from "../components/screen";
 import { useAuth } from "../auth/auth-context";
 import { useFamily } from "../family/family-context";
 import type { MainTabParamList } from "../navigation/types";
+import { dateKeyInSeoul } from "../utils/format";
 import { screenStyles } from "./styles";
 
 type HomeNavigation = BottomTabNavigationProp<MainTabParamList, "Home">;
 
 function todayDateKey() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return dateKeyInSeoul();
 }
 
 function todayLabel(dateKey: string) {
@@ -130,7 +127,8 @@ export function HomeScreen() {
         <Text style={screenStyles.cardTitle}>빠른 행동</Text>
         <AppButton title="생필품 보기" onPress={() => navigation.navigate("HouseholdItems", { screen: "HouseholdItemList" })} variant="secondary" />
         <AppButton title="할 일 보기" onPress={() => navigation.navigate("Todos", { screen: "TodoList" })} variant="secondary" />
-        <AppButton title="가족 캘린더 보기" onPress={() => navigation.navigate("Calendar")} variant="secondary" />
+        <AppButton title="가족 캘린더 보기" onPress={() => navigation.navigate("Calendar", { screen: "CalendarMonth" })} variant="secondary" />
+        <AppButton title="가계부 보기" onPress={() => navigation.navigate("MyHome", { screen: "AccountbookHome" })} variant="secondary" />
         <AppButton title="우리집 매뉴얼 보기" onPress={() => navigation.navigate("MyHome", { screen: "HomeManualList" })} variant="secondary" />
       </AppCard>
     </Screen>

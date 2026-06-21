@@ -60,8 +60,8 @@ export class FixedExpensesService {
 
   async listFixedExpenses(user: CurrentUserPayload, familyId: string, query: ListFixedExpensesQueryDto) {
     await this.ensureFamilyMember(user.userId, familyId);
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const page = this.normalizePage(query.page);
+    const limit = this.normalizeLimit(query.limit);
     const where: Prisma.FixedExpenseWhereInput = {
       familyId,
       deletedAt: null,
@@ -706,6 +706,9 @@ export class FixedExpensesService {
   }
 
   private serializePayment(payment: FixedExpensePaymentWithRelations) {
+    const accountEntry = payment.accountEntry;
+    const accountCategory = accountEntry?.accountCategory;
+
     return {
       id: payment.id,
       requestId: payment.requestId,
@@ -718,18 +721,31 @@ export class FixedExpensesService {
       paidByMemberId: payment.paidByMemberId,
       accountEntryId: payment.accountEntryId,
       note: payment.note,
-      accountEntry: {
-        id: payment.accountEntry.id,
-        title: payment.accountEntry.title,
-        amount: Number(payment.accountEntry.amount),
-        currency: payment.accountEntry.currency,
-        occurredAt: payment.accountEntry.spentAt,
-        categoryCode: payment.accountEntry.accountCategory.code,
-      },
+      accountEntry: accountEntry
+        ? {
+            id: accountEntry.id,
+            title: accountEntry.title,
+            amount: Number(accountEntry.amount),
+            currency: accountEntry.currency,
+            occurredAt: accountEntry.spentAt,
+            categoryCode: accountCategory?.code ?? null,
+          }
+        : null,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       deletedAt: payment.deletedAt,
     };
+  }
+
+  private normalizePage(page: number | string | undefined) {
+    const value = Number(page ?? 1);
+    return Number.isFinite(value) && value >= 1 ? Math.trunc(value) : 1;
+  }
+
+  private normalizeLimit(limit: number | string | undefined) {
+    const value = Number(limit ?? 20);
+    if (!Number.isFinite(value)) return 20;
+    return Math.min(100, Math.max(1, Math.trunc(value)));
   }
 
   private toRepeatRule(dto: { recurrenceType: RecurrenceType; dayOfMonth?: number | null; dayOfWeek?: number | null; intervalValue?: number | null }) {

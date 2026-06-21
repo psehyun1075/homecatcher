@@ -65,3 +65,50 @@ export function todayRangeInSeoul() {
     dueTo: new Date(Date.UTC(year, month - 1, day, 14, 59, 59, 999)).toISOString(),
   };
 }
+
+export function dateKeyInSeoul(value = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
+export function monthKeyInSeoul(value = new Date()) {
+  return dateKeyInSeoul(value).slice(0, 7);
+}
+
+export function shiftMonth(monthKey: string, delta: number) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function monthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-");
+  return `${year}년 ${Number(month)}월`;
+}
+
+export function lastDayOfMonth(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+export function toDateTimeOffset(dateKey: string, time = "12:00") {
+  return `${dateKey}T${time}:00+09:00`;
+}
+
+export function isValidDateKey(value?: string | null) {
+  if (!value) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function formatDateKeyKorean(value?: string | null) {
+  if (!isValidDateKey(value)) return "날짜 없음";
+  const safeValue = value as string;
+  const [year, month, day] = safeValue.split("-");
+  return `${year}년 ${Number(month)}월 ${Number(day)}일`;
+}
