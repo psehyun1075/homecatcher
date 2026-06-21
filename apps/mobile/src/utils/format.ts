@@ -9,7 +9,7 @@ export function formatDateTime(value?: string | null) {
   if (!value) return "없음";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "없음";
-  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 export function formatMoney(value?: number | string | null, currency = "KRW") {

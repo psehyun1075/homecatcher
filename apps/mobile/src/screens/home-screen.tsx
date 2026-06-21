@@ -40,20 +40,27 @@ export function HomeScreen() {
 
   useFocusEffect(refreshDateKey);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        refreshDateKey();
-      }
-    });
-    return () => subscription.remove();
-  }, [refreshDateKey]);
-
   const unreadQuery = useQuery({
     queryKey: ["familyScope", selectedFamily?.id, "notifications", "unread-count"],
     queryFn: () => getUnreadCount(selectedFamily!.id),
     enabled: Boolean(selectedFamily),
   });
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        refreshDateKey();
+        if (selectedFamily) void unreadQuery.refetch();
+      }
+    });
+    return () => subscription.remove();
+  }, [refreshDateKey, selectedFamily, unreadQuery.refetch]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (selectedFamily) void unreadQuery.refetch();
+    }, [selectedFamily, unreadQuery.refetch]),
+  );
 
   const calendarQuery = useQuery({
     queryKey: ["familyScope", selectedFamily?.id, "calendar", "day", dateKey],
@@ -104,6 +111,7 @@ export function HomeScreen() {
         ) : (
           <Text style={screenStyles.cardText}>{unreadQuery.data?.unreadCount ?? 0}개가 기다리고 있어요.</Text>
         )}
+        <AppButton title="알림함 보기" onPress={() => navigation.navigate("MyHome", { screen: "NotificationList" })} variant="secondary" />
       </AppCard>
 
       <AppCard>
@@ -130,6 +138,7 @@ export function HomeScreen() {
         <AppButton title="가족 캘린더 보기" onPress={() => navigation.navigate("Calendar", { screen: "CalendarMonth" })} variant="secondary" />
         <AppButton title="가계부 보기" onPress={() => navigation.navigate("MyHome", { screen: "AccountbookHome" })} variant="secondary" />
         <AppButton title="우리집 매뉴얼 보기" onPress={() => navigation.navigate("MyHome", { screen: "HomeManualList" })} variant="secondary" />
+        <AppButton title="우리집 소식 보기" onPress={() => navigation.navigate("MyHome", { screen: "FamilyFeed" })} variant="secondary" />
       </AppCard>
     </Screen>
   );

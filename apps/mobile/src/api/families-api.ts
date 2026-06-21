@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { Family, Invite } from "./types";
+import type { Family, FamilyMember, Invite } from "./types";
 
 export function listFamilies() {
   return apiRequest<{ families: Family[] }>("/families");
@@ -12,6 +12,12 @@ export function createFamily(familyName: string) {
   });
 }
 
+export function createInvite(familyId: string) {
+  return apiRequest<{ invite: Invite }>(`/families/${familyId}/invites`, {
+    method: "POST",
+  });
+}
+
 export function getInvite(inviteCode: string) {
   return apiRequest<{ invite: Invite }>(`/invites/${encodeURIComponent(inviteCode)}`);
 }
@@ -21,4 +27,8 @@ export function acceptInvite(inviteCode: string) {
     `/invites/${encodeURIComponent(inviteCode)}/accept`,
     { method: "POST" },
   );
+}
+
+export function listFamilyMembers(familyId: string) {
+  return apiRequest<{ members: FamilyMember[] }>(`/families/${familyId}/members`);
 }

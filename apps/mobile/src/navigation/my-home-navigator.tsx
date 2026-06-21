@@ -3,6 +3,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AccountbookEntriesScreen } from "../screens/accountbook/accountbook-entries-screen";
 import { AccountbookEntryCreateScreen } from "../screens/accountbook/accountbook-entry-create-screen";
 import { AccountbookHomeScreen } from "../screens/accountbook/accountbook-home-screen";
+import { ActivityDetailScreen } from "../screens/feed/activity-detail-screen";
+import { FamilyFeedScreen } from "../screens/feed/family-feed-screen";
+import { FamilyInviteScreen } from "../screens/family-invite-screen";
 import { FixedExpenseCreateScreen } from "../screens/fixed-expenses/fixed-expense-create-screen";
 import { FixedExpenseDetailScreen } from "../screens/fixed-expenses/fixed-expense-detail-screen";
 import { FixedExpenseListScreen } from "../screens/fixed-expenses/fixed-expense-list-screen";
@@ -10,6 +13,8 @@ import { FixedExpensePaymentScreen } from "../screens/fixed-expenses/fixed-expen
 import { HomeManualDetailScreen } from "../screens/home-manuals/home-manual-detail-screen";
 import { HomeManualListScreen } from "../screens/home-manuals/home-manual-list-screen";
 import { MyHomeScreen } from "../screens/my-home-screen";
+import { NotificationDetailScreen } from "../screens/notifications/notification-detail-screen";
+import { NotificationListScreen } from "../screens/notifications/notification-list-screen";
 import { colors } from "../theme/colors";
 import type { MyHomeStackParamList } from "./types";
 
@@ -26,6 +31,11 @@ export function MyHomeNavigator() {
       }}
     >
       <Stack.Screen name="MyHomeMain" component={MyHomeScreen} options={{ title: "우리집" }} />
+      <Stack.Screen name="FamilyFeed" component={FamilyFeedScreen} options={{ title: "우리집 소식" }} />
+      <Stack.Screen name="ActivityDetail" component={ActivityDetailScreen} options={{ title: "소식 상세" }} />
+      <Stack.Screen name="NotificationList" component={NotificationListScreen} options={{ title: "알림함" }} />
+      <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} options={{ title: "알림 상세" }} />
+      <Stack.Screen name="FamilyInvite" component={FamilyInviteScreen} options={{ title: "가족 초대하기" }} />
       <Stack.Screen name="HomeManualList" component={HomeManualListScreen} options={{ title: "우리집 매뉴얼" }} />
       <Stack.Screen name="HomeManualDetail" component={HomeManualDetailScreen} options={{ title: "매뉴얼 상세" }} />
       <Stack.Screen name="AccountbookHome" component={AccountbookHomeScreen} options={{ title: "가계부" }} />

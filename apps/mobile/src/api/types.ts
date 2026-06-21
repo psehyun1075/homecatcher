@@ -21,6 +21,14 @@ export interface Family {
   updatedAt?: string;
 }
 
+export interface FamilyMember {
+  id: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  displayName: string | null;
+  joinedAt: string;
+  user: User | null;
+}
+
 export interface Invite {
   id: string;
   familyId: string;

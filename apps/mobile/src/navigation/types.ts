@@ -29,6 +29,11 @@ export type TodosStackParamList = {
 
 export type MyHomeStackParamList = {
   MyHomeMain: undefined;
+  FamilyFeed: undefined;
+  ActivityDetail: { activityId: string };
+  NotificationList: undefined;
+  NotificationDetail: { notificationId: string; readHandled?: boolean };
+  FamilyInvite: undefined;
   HomeManualList: undefined;
   HomeManualDetail: { manualId: string };
   AccountbookHome: undefined;
